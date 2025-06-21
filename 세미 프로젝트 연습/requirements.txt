@@ -14,8 +14,6 @@ imageio-ffmpeg
 sounddevice
 tiktoken
 python-dotenv
-
-# 기타 의존성 최소화
 requests
 protobuf
 jinja2
