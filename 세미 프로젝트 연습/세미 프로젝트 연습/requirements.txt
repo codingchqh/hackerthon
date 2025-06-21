@@ -1,6 +1,0 @@
-openai
-whisper
-moviepy
-pydub
-python-dotenv
-
