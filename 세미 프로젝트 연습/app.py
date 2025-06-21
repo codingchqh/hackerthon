@@ -102,14 +102,13 @@ st.title("맞춤형 영상 생성기")
 name = st.text_input("이름을 입력하세요")
 birth_year = st.number_input("태어난 년도를 입력하세요", min_value=1900, max_value=datetime.now().year, step=1)
 
-if st.button("영상 생성"):
-    if not name or not birth_year:
-        st.warning("이름과 태어난 년도를 모두 입력해주세요.")
+if st.button("나이별 영상 프롬프트 생성"):
+    if not name:
+        st.warning("이름을 입력해주세요.")
     else:
         age = get_age(birth_year)
         st.write(f"안녕하세요, {name}님! 현재 나이는 {age}세 입니다.")
-        
-        # 나이에 따른 영상 프롬프트 예시
+
         if age < 20:
             prompt = f"{name}님의 어린 시절 모습을 담은 밝고 활기찬 영상"
         elif age < 40:
@@ -119,9 +118,15 @@ if st.button("영상 생성"):
         else:
             prompt = f"{name}님의 인생의 지혜와 경험을 담은 감동적인 영상"
         
+        st.write("영상 생성 프롬프트:")
+        st.info(prompt)
+
+        
         
 # --- 2️⃣ 음성 녹음 및 Whisper 전사 ---
 st.header("2️⃣ 음성 녹음 및 Whisper 전사")
+
+IS_LOCAL = True  # 실제 코드에 맞게 설정
 
 if IS_LOCAL and st.button("🎙 5초간 녹음하기"):
     audio_np = record_audio(duration_sec=5)
@@ -149,5 +154,4 @@ if uploaded_file is not None:
     st.subheader("🎬 감성 영상 스크립트")
     st.write(script)
 
-    st.write("영상 생성 프롬프트:")
-    st.info(prompt)
+    
