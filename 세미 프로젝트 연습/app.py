@@ -136,10 +136,7 @@ if st.button("나이별 영상 프롬프트 생성"):
         image_path = st.session_state.get("saved_image_path", None)
         if image_path and os.path.exists(image_path):
             st.image(image_path, caption="🎨 생성된 얼굴 이미지", use_container_width=True)
-            if st.button("🎞️ 영상 만들기"):
-                create_video_from_text_and_image(prompt, image_path)
-        else:
-            st.warning("⚠️ 얼굴 이미지가 없습니다. 사진을 먼저 찍어 주세요.")
+            
 
 # --- 2️⃣ 음성 녹음 및 Whisper 전사 ---
 st.header("2️⃣ 음성 녹음 및 Whisper 전사")
@@ -169,3 +166,7 @@ if uploaded_file is not None:
     st.write(summary)
     st.subheader("🎬 감성 영상 스크립트")
     st.write(script)
+    if st.button("🎞️ 영상 만들기"):
+                create_video_from_text_and_image(prompt, image_path)
+    else:
+        st.warning("⚠️ 얼굴 이미지가 없습니다. 사진을 먼저 찍어 주세요.")
