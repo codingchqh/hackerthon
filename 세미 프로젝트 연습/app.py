@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 from PIL import Image
 import io
@@ -19,25 +18,22 @@ IS_LOCAL = platform.system() != "Linux"
 if IS_LOCAL:
     import sounddevice as sd
 
-# --- Whisper 모델 캐시 로드 ---
 @st.cache_resource
 def load_model():
     return whisper.load_model("base")
 
 model = load_model()
 
-# --- 오디오 녹음 함수 (로컬 전용) ---
 def record_audio(duration_sec=5, fs=16000, device=None):
     if not IS_LOCAL:
-        st.error("⚠️ 이 기능은 로컬 환경에서만 작동합니다. Streamlit Cloud에서는 음성 파일을 업로드해 주세요.")
+        st.error("⚠️ 로컬에서만 녹음이 가능합니다.")
         return None
-    st.info(f"{duration_sec}초간 녹음 시작...")
+    st.info(f"{duration_sec}초간 녹음 중...")
     audio = sd.rec(int(duration_sec * fs), samplerate=fs, channels=1, dtype='int16', device=device)
     sd.wait()
     st.success("녹음 완료!")
     return audio.flatten()
 
-# --- NumPy 배열 -> WAV 바이트 스트림 변환 ---
 def numpy_to_wav_bytes(audio_np, fs=16000):
     buffer = io.BytesIO()
     with wave.open(buffer, 'wb') as wf:
@@ -48,7 +44,6 @@ def numpy_to_wav_bytes(audio_np, fs=16000):
     buffer.seek(0)
     return buffer
 
-# --- Whisper 전사 및 요약/스크립트 생성 ---
 def transcribe_audio(model, wav_io):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
         tmp_file.write(wav_io.read())
@@ -60,25 +55,21 @@ def transcribe_audio(model, wav_io):
     transcript = result["text"]
     summary = summarize_text(transcript)
     script = generate_video_script(summary)
-
     return transcript, summary, script
 
-# --- 나이 계산 함수 ---
 def get_age(birth_year):
     current_year = datetime.now().year
     return current_year - birth_year
 
-# --- 영상 생성 함수 (예시) ---
-def create_video_from_text_and_image(prompt, image_path):
-    # 여기에 실제 영상 생성 로직을 구현하거나 외부 API 호출 가능
-    st.info(f"영상 생성 중...\n\n🧾 프롬프트: {prompt}\n🖼️ 이미지: {image_path}")
+def create_video_from_text_and_image(full_prompt, image_path):
+    st.info(f"영상 생성 중...\n\n🧾 프롬프트: {full_prompt}\n🖼️ 이미지: {image_path}")
     st.success("✅ (예시) 영상 생성 완료!")
 
-# --- Streamlit 설정 ---
-st.set_page_config(page_title="AI 아바타 + 음성 녹음 & 전사", layout="centered")
-st.title("📸 AI 아바타 생성 + 🎤 음성 녹음 & Whisper 전사")
+# --- UI 시작 ---
+st.set_page_config(page_title="AI 아바타 + Whisper 전사", layout="centered")
+st.title("📸 AI 아바타 생성 + 🎤 음성 전사 & 영상 생성")
 
-# --- 1️⃣ 사진 촬영 및 얼굴 추출 ---
+# --- 1️⃣ 사진 촬영 ---
 st.header("1️⃣ 사진 촬영 및 얼굴 추출")
 image_file = st.camera_input("아바타용 사진을 찍어보세요")
 
@@ -88,34 +79,32 @@ if image_file:
 
     face_img = extract_face(image_pil)
     if face_img is None:
-        st.error("😢 얼굴을 인식하지 못했습니다. 다시 시도해주세요.")
+        st.error("😢 얼굴을 인식하지 못했습니다.")
     else:
-        st.image(face_img, caption="✂️ 얼굴 영역 추출", width=256)
-        st.write("🎨 AI 아바타 생성 (임시 버전)")
+        st.image(face_img, caption="✂️ 얼굴 추출", width=256)
         avatar_img = face_img
-        st.image(avatar_img, caption="🖼️ 생성된 AI 아바타", use_container_width=True)
+        st.image(avatar_img, caption="🖼️ AI 아바타", use_container_width=True)
 
         save_dir = "image"
         os.makedirs(save_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         save_path = os.path.join(save_dir, f"face_{timestamp}.jpg")
         avatar_img.save(save_path)
-        st.success(f"얼굴 이미지가 저장되었습니다:\n{save_path}")
-
+        st.success(f"이미지 저장 완료: {save_path}")
         st.session_state["saved_image_path"] = save_path
 
-# --- 2️⃣ 이름 및 생년 → 프롬프트 생성 ---
-st.title("맞춤형 영상 생성기 🎬")
+# --- 2️⃣ 이름/생년 기반 프롬프트 생성 ---
+st.title("맞춤형 영상 프롬프트 생성기 🎬")
 
 name = st.text_input("이름을 입력하세요")
 birth_year = st.number_input("태어난 년도를 입력하세요", min_value=1900, max_value=datetime.now().year, step=1)
 
-if st.button("나이별 영상 프롬프트 생성"):
+if st.button("프롬프트 생성"):
     if not name:
         st.warning("이름을 입력해주세요.")
     else:
         age = get_age(birth_year)
-        st.write(f"안녕하세요, {name}님! 현재 나이는 {age}세 입니다.")
+        st.write(f"안녕하세요, {name}님! 현재 나이는 {age}세입니다.")
 
         if age < 20:
             prompt = f"{name}님의 어린 시절 모습을 담은 밝고 활기찬 영상"
@@ -126,12 +115,10 @@ if st.button("나이별 영상 프롬프트 생성"):
         else:
             prompt = f"{name}님의 인생의 지혜와 경험을 담은 감동적인 영상"
 
-        st.write("🧾 생성된 영상 프롬프트:")
         st.info(prompt)
+        st.session_state["video_prompt"] = prompt
 
-        st.session_state["video_prompt"] = prompt  # ✅ 프롬프트 저장
-
-# --- 3️⃣ 음성 녹음 및 Whisper 전사 ---
+# --- 3️⃣ 음성 전사 및 요약 ---
 st.header("3️⃣ 음성 녹음 및 Whisper 전사")
 
 if IS_LOCAL and st.button("🎙 5초간 녹음하기"):
@@ -146,10 +133,11 @@ if IS_LOCAL and st.button("🎙 5초간 녹음하기"):
         st.write(summary)
         st.subheader("🎬 감성 영상 스크립트")
         st.write(script)
+        st.session_state["script"] = script  # ✅ 감성 스크립트 저장
 
 uploaded_file = st.file_uploader("또는 오디오 파일(.wav/.mp3)을 업로드하세요", type=["wav", "mp3"])
 
-if uploaded_file is not None:
+if uploaded_file:
     st.audio(uploaded_file, format="audio/wav")
     transcript, summary, script = transcribe_audio(model, uploaded_file)
     st.subheader("📝 전사 결과")
@@ -158,17 +146,26 @@ if uploaded_file is not None:
     st.write(summary)
     st.subheader("🎬 감성 영상 스크립트")
     st.write(script)
+    st.session_state["script"] = script  # ✅ 감성 스크립트 저장
 
-# --- 4️⃣ 영상 생성 버튼 (맨 아래 고정) ---
+# --- 4️⃣ 영상 생성 ---
 st.header("4️⃣ 영상 생성")
 
 prompt = st.session_state.get("video_prompt", None)
 image_path = st.session_state.get("saved_image_path", None)
+script = st.session_state.get("script", None)
 
 if prompt and image_path and os.path.exists(image_path):
     st.image(image_path, caption="🎨 최종 영상용 얼굴 이미지", use_container_width=True)
-    st.info(f"🧾 영상 프롬프트:\n\n{prompt}")
+
+    if script:
+        full_prompt = f"{prompt}\n\n🗣️ 감성 대사:\n{script}"
+    else:
+        full_prompt = prompt
+
+    st.info(f"🧾 영상 프롬프트:\n\n{full_prompt}")
+
     if st.button("🎞️ 영상 만들기"):
-        create_video_from_text_and_image(prompt, image_path)
+        create_video_from_text_and_image(full_prompt, image_path)
 else:
-    st.warning("⚠️ 프롬프트 또는 얼굴 이미지가 준비되지 않았습니다.\n이름과 생년 입력 및 사진 촬영을 먼저 진행해주세요.")
+    st.warning("⚠️ 영상 생성을 위해 이름, 생년, 얼굴 사진, 음성 등을 모두 입력해주세요.")
