@@ -119,9 +119,7 @@ if st.button("영상 생성"):
         else:
             prompt = f"{name}님의 인생의 지혜와 경험을 담은 감동적인 영상"
         
-        st.write("영상 생성 프롬프트:")
-        st.info(prompt)
-
+        
 # --- 2️⃣ 음성 녹음 및 Whisper 전사 ---
 st.header("2️⃣ 음성 녹음 및 Whisper 전사")
 
@@ -150,3 +148,6 @@ if uploaded_file is not None:
     st.write(summary)
     st.subheader("🎬 감성 영상 스크립트")
     st.write(script)
+
+    st.write("영상 생성 프롬프트:")
+    st.info(prompt)
