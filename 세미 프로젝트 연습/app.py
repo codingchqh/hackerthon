@@ -9,8 +9,11 @@ import tempfile
 import os
 import datetime
 import platform
+import streamlit as st
+
 
 from camera.face_capture import extract_face
+from datetime import datetime
 from summarizer.gpt_summarizer import summarize_text, generate_video_script
 
 # --- 플랫폼 확인 (로컬/클라우드 구분) ---
@@ -89,6 +92,35 @@ if image_file:
         save_path = os.path.join(save_dir, f"face_{timestamp}.jpg")
         avatar_img.save(save_path)
         st.success(f"얼굴 이미지가 저장되었습니다:\n{save_path}")
+
+def get_age(birth_year):
+    current_year = datetime.now().year
+    return current_year - birth_year
+
+st.title("맞춤형 영상 생성기")
+
+name = st.text_input("이름을 입력하세요")
+birth_year = st.number_input("태어난 년도를 입력하세요", min_value=1900, max_value=datetime.now().year, step=1)
+
+if st.button("영상 생성"):
+    if not name or not birth_year:
+        st.warning("이름과 태어난 년도를 모두 입력해주세요.")
+    else:
+        age = get_age(birth_year)
+        st.write(f"안녕하세요, {name}님! 현재 나이는 {age}세 입니다.")
+        
+        # 나이에 따른 영상 프롬프트 예시
+        if age < 20:
+            prompt = f"{name}님의 어린 시절 모습을 담은 밝고 활기찬 영상"
+        elif age < 40:
+            prompt = f"{name}님의 젊고 역동적인 모습을 담은 세련된 영상"
+        elif age < 60:
+            prompt = f"{name}님의 성숙하고 안정된 모습을 담은 따뜻한 영상"
+        else:
+            prompt = f"{name}님의 인생의 지혜와 경험을 담은 감동적인 영상"
+        
+        st.write("영상 생성 프롬프트:")
+        st.info(prompt)
 
 # --- 2️⃣ 음성 녹음 및 Whisper 전사 ---
 st.header("2️⃣ 음성 녹음 및 Whisper 전사")
