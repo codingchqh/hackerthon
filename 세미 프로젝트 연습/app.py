@@ -6,7 +6,6 @@ import wave
 import whisper
 import tempfile
 import os
-import datetime
 import platform
 from datetime import datetime
 
@@ -18,56 +17,26 @@ IS_LOCAL = platform.system() != "Linux"
 if IS_LOCAL:
     import sounddevice as sd
 
-@st.cache_resource
+# --- 모델 로드 함수 (캐시 제거) ---
 def load_model():
     return whisper.load_model("base")
 
-model = load_model()
-
-def record_audio(duration_sec=5, fs=16000, device=None):
-    if not IS_LOCAL:
-        st.error("⚠️ 로컬에서만 녹음이 가능합니다.")
-        return None
-    st.info(f"{duration_sec}초간 녹음 중...")
-    audio = sd.rec(int(duration_sec * fs), samplerate=fs, channels=1, dtype='int16', device=device)
-    sd.wait()
-    st.success("녹음 완료!")
-    return audio.flatten()
-
-def numpy_to_wav_bytes(audio_np, fs=16000):
-    buffer = io.BytesIO()
-    with wave.open(buffer, 'wb') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(fs)
-        wf.writeframes(audio_np.tobytes())
-    buffer.seek(0)
-    return buffer
-
-def transcribe_audio(model, wav_io):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-        tmp_file.write(wav_io.read())
-        tmp_path = tmp_file.name
-
-    result = model.transcribe(tmp_path)
-    os.remove(tmp_path)
-
-    transcript = result["text"]
-    summary = summarize_text(transcript)
-    script = generate_video_script(summary)
-    return transcript, summary, script
-
-def get_age(birth_year):
-    current_year = datetime.now().year
-    return current_year - birth_year
-
-def create_video_from_text_and_image(full_prompt, image_path):
-    st.info(f"영상 생성 중...\n\n🧾 프롬프트: {full_prompt}\n🖼️ 이미지: {image_path}")
-    st.success("✅ (예시) 영상 생성 완료!")
+# --- 세션 상태 초기화 ---
+if "model" not in st.session_state:
+    st.session_state.model = None
 
 # --- UI 시작 ---
 st.set_page_config(page_title="AI 아바타 + Whisper 전사", layout="centered")
 st.title("📸 AI 아바타 생성 + 🎤 음성 전사 & 영상 생성")
+
+# --- 0️⃣ 모델 로드 버튼 ---
+if st.session_state.model is None:
+    if st.button("모델 로드하기"):
+        with st.spinner("모델을 로딩중입니다... 잠시만 기다려주세요."):
+            st.session_state.model = load_model()
+        st.success("✅ 모델이 성공적으로 로드되었습니다!")
+else:
+    st.info("✅ 모델이 로드되어 사용 가능합니다.")
 
 # --- 1️⃣ 사진 촬영 ---
 st.header("1️⃣ 사진 촬영 및 얼굴 추출")
@@ -99,6 +68,10 @@ st.title("맞춤형 영상 프롬프트 생성기 🎬")
 name = st.text_input("이름을 입력하세요")
 birth_year = st.number_input("태어난 년도를 입력하세요", min_value=1900, max_value=datetime.now().year, step=1)
 
+def get_age(birth_year):
+    current_year = datetime.now().year
+    return current_year - birth_year
+
 if st.button("프롬프트 생성"):
     if not name:
         st.warning("이름을 입력해주세요.")
@@ -118,35 +91,75 @@ if st.button("프롬프트 생성"):
         st.info(prompt)
         st.session_state["video_prompt"] = prompt
 
-# --- 3️⃣ 음성 전사 및 요약 ---
-st.header("3️⃣ 음성 녹음 및 Whisper 전사")
+# --- 3️⃣ 음성 녹음 및 Whisper 전사 ---
+
+def record_audio(duration_sec=5, fs=16000, device=None):
+    if not IS_LOCAL:
+        st.error("⚠️ 로컬에서만 녹음이 가능합니다.")
+        return None
+    st.info(f"{duration_sec}초간 녹음 중...")
+    audio = sd.rec(int(duration_sec * fs), samplerate=fs, channels=1, dtype='int16', device=device)
+    sd.wait()
+    st.success("녹음 완료!")
+    return audio.flatten()
+
+def numpy_to_wav_bytes(audio_np, fs=16000):
+    buffer = io.BytesIO()
+    with wave.open(buffer, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(fs)
+        wf.writeframes(audio_np.tobytes())
+    buffer.seek(0)
+    return buffer
+
+def transcribe_audio(model, wav_io):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+        tmp_file.write(wav_io.read())
+        tmp_path = tmp_file.name
+
+    try:
+        result = model.transcribe(tmp_path)
+    finally:
+        os.remove(tmp_path)
+
+    transcript = result["text"]
+    summary = summarize_text(transcript)
+    script = generate_video_script(summary)
+    return transcript, summary, script
 
 if IS_LOCAL and st.button("🎙 5초간 녹음하기"):
-    audio_np = record_audio(duration_sec=5)
-    if audio_np is not None:
-        wav_bytes = numpy_to_wav_bytes(audio_np)
-        st.audio(wav_bytes, format="audio/wav")
-        transcript, summary, script = transcribe_audio(model, wav_bytes)
+    if st.session_state.model is None:
+        st.warning("먼저 모델을 로드해주세요!")
+    else:
+        audio_np = record_audio(duration_sec=5)
+        if audio_np is not None:
+            wav_bytes = numpy_to_wav_bytes(audio_np)
+            st.audio(wav_bytes, format="audio/wav")
+            transcript, summary, script = transcribe_audio(st.session_state.model, wav_bytes)
+            st.subheader("📝 전사 결과")
+            st.write(transcript)
+            st.subheader("🔍 요약")
+            st.write(summary)
+            st.subheader("🎬 감성 영상 스크립트")
+            st.write(script)
+            st.session_state["script"] = script
+
+uploaded_file = st.file_uploader("또는 오디오 파일(.wav/.mp3)을 업로드하세요", type=["wav", "mp3"])
+
+if uploaded_file:
+    if st.session_state.model is None:
+        st.warning("먼저 모델을 로드해주세요!")
+    else:
+        st.audio(uploaded_file, format="audio/wav")
+        transcript, summary, script = transcribe_audio(st.session_state.model, uploaded_file)
         st.subheader("📝 전사 결과")
         st.write(transcript)
         st.subheader("🔍 요약")
         st.write(summary)
         st.subheader("🎬 감성 영상 스크립트")
         st.write(script)
-        st.session_state["script"] = script  # ✅ 감성 스크립트 저장
-
-uploaded_file = st.file_uploader("또는 오디오 파일(.wav/.mp3)을 업로드하세요", type=["wav", "mp3"])
-
-if uploaded_file:
-    st.audio(uploaded_file, format="audio/wav")
-    transcript, summary, script = transcribe_audio(model, uploaded_file)
-    st.subheader("📝 전사 결과")
-    st.write(transcript)
-    st.subheader("🔍 요약")
-    st.write(summary)
-    st.subheader("🎬 감성 영상 스크립트")
-    st.write(script)
-    st.session_state["script"] = script  # ✅ 감성 스크립트 저장
+        st.session_state["script"] = script
 
 # --- 4️⃣ 영상 생성 ---
 st.header("4️⃣ 영상 생성")
@@ -154,6 +167,10 @@ st.header("4️⃣ 영상 생성")
 prompt = st.session_state.get("video_prompt", None)
 image_path = st.session_state.get("saved_image_path", None)
 script = st.session_state.get("script", None)
+
+def create_video_from_text_and_image(full_prompt, image_path):
+    st.info(f"영상 생성 중...\n\n🧾 프롬프트: {full_prompt}\n🖼️ 이미지: {image_path}")
+    st.success("✅ (예시) 영상 생성 완료!")
 
 if prompt and image_path and os.path.exists(image_path):
     st.image(image_path, caption="🎨 최종 영상용 얼굴 이미지", use_container_width=True)
