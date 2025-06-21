@@ -9,6 +9,7 @@ import os
 import platform
 from datetime import datetime
 
+
 from camera.face_capture import extract_face
 from summarizer.gpt_summarizer import summarize_text, generate_video_script
 
