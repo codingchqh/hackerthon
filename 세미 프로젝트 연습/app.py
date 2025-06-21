@@ -135,7 +135,7 @@ if st.button("나이별 영상 프롬프트 생성"):
         # 얼굴 이미지 출력 + 영상 생성 버튼
         image_path = st.session_state.get("saved_image_path", None)
         if image_path and os.path.exists(image_path):
-            st.image(image_path, caption="🎨 생성된 얼굴 이미지", use_column_width=True)
+            st.image(image_path, caption="🎨 생성된 얼굴 이미지", use_container_width=True)
             if st.button("🎞️ 영상 만들기"):
                 create_video_from_text_and_image(prompt, image_path)
         else:
