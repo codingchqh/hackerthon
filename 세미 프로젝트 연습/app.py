@@ -8,6 +8,7 @@ import tempfile
 import os
 import platform
 from datetime import datetime
+from avatar.avatar_gen import generate_avatar  # ✅ 아바타 생성 함수 추가
 
 
 from camera.face_capture import extract_face
