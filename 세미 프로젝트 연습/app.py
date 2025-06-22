@@ -39,28 +39,48 @@ if st.session_state.model is None:
 else:
     st.info("✅ 모델이 로드되어 사용 가능합니다.")
 
-# --- 1️⃣ 사진 촬영 ---
-st.header("1️⃣ 사진 촬영 및 얼굴 추출")
-image_file = st.camera_input("아바타용 사진을 찍어보세요")
+# --- 디렉토리 생성 ---
+os.makedirs("image", exist_ok=True)
 
-if image_file:
-    image_pil = Image.open(image_file)
-    st.image(image_pil, caption="📷 촬영된 원본 이미지", use_container_width=True)
+# --- 1️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드 ---
+st.header("1️⃣ 얼굴 이미지 입력 및 아바타 생성")
 
+# 탭으로 선택 (촬영 또는 업로드)
+tab1, tab2 = st.tabs(["📸 카메라 촬영", "🖼️ 이미지 업로드"])
+
+image_pil = None
+
+with tab1:
+    image_file = st.camera_input("아바타용 사진을 찍어보세요")
+    if image_file:
+        image_pil = Image.open(image_file)
+        st.image(image_pil, caption="📷 촬영된 원본 이미지", use_container_width=True)
+
+with tab2:
+    uploaded_file = st.file_uploader("이미지를 업로드하세요 (jpg/png)", type=["jpg", "jpeg", "png"])
+    if uploaded_file:
+        image_pil = Image.open(uploaded_file)
+        st.image(image_pil, caption="🖼️ 업로드된 이미지", use_container_width=True)
+
+# 얼굴 추출 및 아바타 생성
+if image_pil:
     face_img = extract_face(image_pil)
     if face_img is None:
-        st.error("😢 얼굴을 인식하지 못했습니다.")
+        st.error("😢 얼굴을 인식하지 못했습니다. 다른 이미지를 시도해주세요.")
     else:
-        st.image(face_img, caption="✂️ 얼굴 추출", width=256)
-        avatar_img = face_img
-        st.image(avatar_img, caption="🖼️ AI 아바타", use_container_width=True)
+        st.image(face_img, caption="✂️ 추출된 얼굴", width=256)
 
-        save_dir = "image"
-        os.makedirs(save_dir, exist_ok=True)
+        # ✅ 아바타 생성
+        avatar_img = generate_avatar(face_img)
+        st.image(avatar_img, caption="🖼️ 생성된 AI 아바타", use_container_width=True)
+
+        # ✅ 저장 경로 구성
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = os.path.join(save_dir, f"face_{timestamp}.jpg")
+        save_path = f"image/avatar_{timestamp}.jpg"
         avatar_img.save(save_path)
-        st.success(f"이미지 저장 완료: {save_path}")
+        st.success(f"✅ 아바타 이미지 저장 완료: {save_path}")
+
+        # ✅ 세션 상태 저장
         st.session_state["saved_image_path"] = save_path
 
 # --- 2️⃣ 이름/생년 기반 프롬프트 생성 ---

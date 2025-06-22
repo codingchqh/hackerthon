@@ -4,7 +4,7 @@ from PIL import Image
 from stt.whs_st import load_model, record_audio, numpy_to_wav_bytes, transcribe_audio
 from summarizer.gpt_summarizer import summarize_text, generate_video_script
 from camera.face_capture import extract_face
-from avatar_creat.avatar_generator import generate_avatar  # ✅ 아바타 생성 함수 import
+from avatar_create.avatar_generator import generate_avatar  # ✅ 아바타 생성 함수 import
 from video.Text_To_video import make_video_from_text, save_wav_file
 
 # --- 설정 ---
