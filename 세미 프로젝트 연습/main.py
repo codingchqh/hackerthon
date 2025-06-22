@@ -4,12 +4,14 @@ from PIL import Image
 from stt.whs_st import load_model, record_audio, numpy_to_wav_bytes, transcribe_audio
 from summarizer.gpt_summarizer import summarize_text, generate_video_script
 from camera.face_capture import extract_face
+from avatar_creat.avatar_generator import generate_avatar  # ✅ 아바타 생성 함수 import
 from video.Text_To_video import make_video_from_text, save_wav_file
 
 # --- 설정 ---
 AUDIO_FILE = "audio/recorded.wav"
 ORIGINAL_IMAGE_FILE = "camera/sample.jpg"
 FACE_IMAGE_FILE = "camera/face_extracted.jpg"
+AVATAR_IMAGE_FILE = "camera/avatar.jpg"  # ✅ 아바타 이미지 경로 추가
 VIDEO_OUTPUT_PATH = "output/output.mp4"
 
 # --- 디렉토리 생성 ---
@@ -51,9 +53,16 @@ if face_img is None:
     image_path = ORIGINAL_IMAGE_FILE
 else:
     print(f"✅ 얼굴 이미지 저장 완료: {FACE_IMAGE_FILE}")
-    image_path = FACE_IMAGE_FILE
+    
+    # --- 2.5 아바타 이미지 생성 ---
+    print("\n2.5 아바타 이미지 생성 시작...")
+    avatar_img = generate_avatar(face_img)
+    avatar_img.save(AVATAR_IMAGE_FILE)
+    print(f"✅ 아바타 이미지 저장 완료: {AVATAR_IMAGE_FILE}")
+    
+    image_path = AVATAR_IMAGE_FILE  # ✅ 영상 생성에 사용할 이미지 경로 갱신
 
 # --- 3. 영상 생성 ---
 print("\n3. 영상 생성 시작...")
-make_video_from_text(script, output_path=VIDEO_OUTPUT_PATH)
+make_video_from_text(script, output_path=VIDEO_OUTPUT_PATH, image_path=image_path)
 print(f"\n✅ 영상 생성 완료: {VIDEO_OUTPUT_PATH}")

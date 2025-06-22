@@ -4,6 +4,7 @@ from PIL import Image # PIL (Pillow) 라이브러리 임포트: 이미지 파일
 from typing import Optional # 타입 힌트 사용을 위한 Optional 임포트
 import os # 운영체제 기능 (파일 및 경로 처리) 사용을 위한 os 임포트
 
+
 def extract_face(image_pil: Image.Image, save_path: Optional[str] = None) -> Optional[Image.Image]:
     """
     입력된 PIL 이미지에서 가장 큰 얼굴을 찾아 잘라서 PIL 이미지로 반환합니다.
