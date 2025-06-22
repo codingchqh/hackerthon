@@ -28,8 +28,9 @@ if "model" not in st.session_state:
     st.session_state.model = None
 
 # --- UI 시작 ---
-st.set_page_config(page_title="AI 아바타 + Whisper 전사", layout="centered")
-st.title("📸 AI 아바타 생성 + 🎤 음성 전사 & 영상 생성")
+st.set_page_config(page_title="공감 on(溫)", layout="centered")
+st.title("📸 공감 on(溫)")
+
 
 # --- 0️⃣ 모델 로드 버튼 ---
 if st.session_state.model is None:
