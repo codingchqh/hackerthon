@@ -110,18 +110,22 @@ if image_pil:
 
         if gender == "남자":
             avatar_generation_prompt = (
-                "Create a realistic portrait of a man based on the original image. Keep all of his facial features and structure intact. "
-                "Enhance his appearance subtly: smooth skin texture, defined jawline, sharp and expressive eyes, and soft natural lighting. "
-                "Maintain a masculine look with a confident but approachable expression. Do not feminize, stylize, or exaggerate. "
-                "High resolution, photorealistic finish."
+                "Create a photorealistic studio portrait of a Korean man based on the original image. "
+                "Preserve all facial features and structure, ensuring the identity and ethnicity are clearly Korean. "
+                "Enhance his appearance subtly: smooth skin texture, defined jawline, sharp expressive eyes, and soft, natural lighting. "
+                "Maintain a masculine look with a confident but approachable expression. "
+                "Do not exaggerate, stylize, or westernize. High-resolution, true-to-life realism."
             )
+
         else:
             avatar_generation_prompt = (
-                "Create a realistic portrait of a woman based on the original image. Keep her facial structure and identity completely intact. "
-                "Enhance her appearance gently: smooth and glowing skin, slightly brightened eyes, soft facial expression, and flattering lighting. "
-                "Preserve a feminine and natural look. Do not stylize or exaggerate. "
-                "Final result should look like a refined studio photo of a real woman. High resolution, photorealistic style."
+                "Create a photorealistic studio portrait of a Korean woman based on the original image. "
+                "Keep her facial structure, identity, and Korean ethnicity clearly intact. "
+                "Gently enhance her features: smooth glowing skin, brightened eyes, soft expression, and flattering lighting. "
+                "Maintain a feminine and natural appearance, avoiding stylization or exaggeration. "
+                "The result should look like a refined studio photo of a real Korean woman. High resolution, true-to-life realism."
             )
+
 
         avatar_img = None
         try:
