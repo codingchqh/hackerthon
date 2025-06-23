@@ -4,7 +4,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+
 
 def generate_avatar_image(prompt: str, n_images: int = 1, size: str = "512x512") -> list:
     try:
