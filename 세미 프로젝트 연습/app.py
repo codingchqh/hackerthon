@@ -116,7 +116,7 @@ if image_pil:
         st.image(face_img, caption="✂️ 추출된 얼굴", width=256) # 추출된 얼굴 표시
 
         # 아바타 생성을 위한 프롬프트 설정 (텍스트 프롬프트)
-        avatar_generation_prompt = "Create a hyper-realistic portrait of a person based on the original image, making them look more attractive while still natural. Enhance beauty subtly: clear and glowing skin, bright and expressive eyes, symmetrical facial features, and a soft, confident expression. Use soft cinematic lighting and realistic skin texture. The image should look like a high-end, professional studio photo of a real person — not stylized, not cartoonish, and not exaggerated. Make it elegant, warm, and believable."
+        avatar_generation_prompt = "Enhance the original photo realistically. Keep the person's facial structure, proportions, and identity completely intact. Just smooth the skin slightly, brighten the eyes subtly, and improve overall lighting and clarity. Do NOT change facial shape or identity. No stylization. No exaggeration."
 
         avatar_urls = [] # generate_avatar_image가 반환할 URL 리스트
         try:
