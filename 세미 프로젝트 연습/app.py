@@ -8,7 +8,7 @@ import tempfile
 import os
 import platform
 from datetime import datetime
-from avatar_create.avatar_generator import generate_avatar
+from avatar_create.avatar_generator import generate_avatar_image
 from camera.face_capture import extract_face
 from summarizer.gpt_summarizer import summarize_text, generate_video_script
 
@@ -65,7 +65,7 @@ if image_pil:
         st.error("😢 얼굴을 인식하지 못했습니다. 다른 이미지를 시도해주세요.")
     else:
         st.image(face_img, caption="✂️ 추출된 얼굴", width=256)
-        avatar_img = generate_avatar(face_img)
+        avatar_img = generate_avatar_image(face_img)
         st.image(avatar_img, caption="🖼️ 생성된 AI 아바타", use_container_width=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
