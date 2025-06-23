@@ -49,31 +49,59 @@ else:
 # --- 디렉토리 생성 ---
 os.makedirs("image", exist_ok=True)
 
-# --- 1️⃣ 이름/생년 입력 및 프롬프트 생성 ---
-st.title("맞춤형 영상 프롬프트 생성기 🎬")
-name = st.text_input("이름을 입력하세요")
-birth_year = st.number_input("태어난 년도를 입력하세요", min_value=1900, max_value=datetime.now().year, step=1)
+# --- 👨‍👩‍👧‍👦 가족 이름 입력 및 테마 선택 ---
+st.title("가족 이야기 영상 프롬프트 생성기 👨‍👩‍👧‍👦")
 
-def get_age(birth_year):
-    """생년월일로 나이를 계산합니다."""
-    return datetime.now().year - birth_year
+# 1. 가족 이름 입력
+family_name = st.text_input("가족의 호칭을 입력하세요 (예: 사랑하는 우리 가족, 행복한 김씨네)")
 
-if st.button("프롬프트 생성"):
-    if not name:
-        st.warning("이름을 입력해주세요.")
+# 2. 영상 테마 6가지 정의
+themes = [
+    "우리의 평범하지만 소중한 일상",
+    "함께 떠났던 즐거운 여행의 추억",
+    "특별한 날의 행복했던 순간들 (생일, 명절 등)",
+    "아이들의 사랑스러운 성장 기록",
+    "다시 봐도 웃음이 나는 우리 가족의 재미있는 순간",
+    "서로에게 전하는 사랑과 감사의 메시지"
+]
+
+# 3. 라디오 버튼으로 테마 선택
+selected_theme = st.radio(
+    "어떤 테마의 영상을 만들고 싶으신가요?",
+    themes,
+    # index=0 # 기본 선택값을 첫 번째 옵션으로 설정
+)
+
+# 4. 프롬프트 생성 버튼
+if st.button("프롬프트 생성하기"):
+    # 가족 호칭을 입력했는지 확인
+    if not family_name:
+        st.warning("가족의 호칭을 입력해주세요!")
     else:
-        age = get_age(birth_year)
-        st.write(f"안녕하세요, {name}님! 현재 나이는 {age}세입니다.")
-        # 나이에 따른 비디오 프롬프트 생성
-        if age < 20:
-            prompt = f"{name}님의 어린 시절 모습을 담은 밝고 활기찬 영상"
-        elif age < 40:
-            prompt = f"{name}님의 젊고 역동적인 모습을 담은 세련된 영상"
-        elif age < 60:
-            prompt = f"{name}님의 성숙하고 안정된 모습을 담은 따뜻한 영상"
-        else:
-            prompt = f"{name}님의 인생의 지혜와 경험을 담은 감동적인 영상"
-        st.info(f"생성된 영상 프롬프트:\n\n{prompt}")
+        # 선택된 테마에 따라 맞춤형 프롬프트 생성
+        if selected_theme == themes[0]: # 우리의 평범하지만 소중한 일상
+            prompt = f"'{family_name}'의 소소한 행복이 담긴 일상을 따뜻하고 감성적인 영상으로 만들어줘. 아침 식사, 함께하는 산책, 저녁의 대화 같은 장면을 중심으로."
+
+        elif selected_theme == themes[1]: # 함께 떠났던 즐거운 여행의 추억
+            prompt = f"'{family_name}'이 함께 떠났던 여행의 순간들을 모아 경쾌하고 신나는 영상으로 만들어줘. 아름다운 풍경과 가족들의 웃음소리가 가득하게."
+
+        elif selected_theme == themes[2]: # 특별한 날의 행복했던 순간들
+            prompt = f"'{family_name}'의 생일 파티, 기념일, 명절 등 특별했던 날의 기억들을 모아 행복이 넘치는 축제 분위기의 영상으로 제작해줘."
+
+        elif selected_theme == themes[3]: # 아이들의 사랑스러운 성장 기록
+            prompt = f"'{family_name}' 아이들의 사랑스러운 성장 과정을 담은 영상. 첫 걸음마부터 입학식까지, 감동적인 순간들을 시간 순서대로 보여줘."
+
+        elif selected_theme == themes[4]: # 다시 봐도 웃음이 나는 우리 가족의 재미있는 순간
+            prompt = f"'{family_name}'의 배꼽 빠지는 재미있는 실수나 장난들을 모아서 유쾌하고 코믹한 시트콤 같은 영상으로 만들어줘. 웃음 효과음도 넣어줘."
+
+        elif selected_theme == themes[5]: # 서로에게 전하는 사랑과 감사의 메시지
+            prompt = f"'{family_name}' 구성원들이 서로에게 전하는 진심 어린 사랑과 감사의 마음을 담은 뭉클한 영상. 잔잔한 배경 음악과 함께 따뜻한 메시지를 자막으로 넣어줘."
+
+        # 생성된 프롬프트 보여주기
+        st.info(f"✅ 생성된 영상 프롬프트입니다:")
+        st.write(f"**{prompt}**")
+
+        # 세션 상태에 프롬프트 저장 (다른 페이지나 기능에서 사용하기 위함)
         st.session_state["video_prompt"] = prompt
 
 # --- 2️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드 ---
