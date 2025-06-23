@@ -56,8 +56,35 @@ else:
 # --- 디렉토리 생성 ---
 os.makedirs("image", exist_ok=True)
 
-# --- 1️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드 ---
-st.header("1️⃣ 얼굴 이미지 입력 및 아바타 생성")
+# --- 1️⃣ 이름/생년 입력 및 프롬프트 생성 ---
+st.title("맞춤형 영상 프롬프트 생성기 🎬")
+name = st.text_input("이름을 입력하세요")
+birth_year = st.number_input("태어난 년도를 입력하세요", min_value=1900, max_value=datetime.now().year, step=1)
+
+def get_age(birth_year):
+    """생년월일로 나이를 계산합니다."""
+    return datetime.now().year - birth_year
+
+if st.button("프롬프트 생성"):
+    if not name:
+        st.warning("이름을 입력해주세요.")
+    else:
+        age = get_age(birth_year)
+        st.write(f"안녕하세요, {name}님! 현재 나이는 {age}세입니다.")
+        # 나이에 따른 비디오 프롬프트 생성
+        if age < 20:
+            prompt = f"{name}님의 어린 시절 모습을 담은 밝고 활기찬 영상"
+        elif age < 40:
+            prompt = f"{name}님의 젊고 역동적인 모습을 담은 세련된 영상"
+        elif age < 60:
+            prompt = f"{name}님의 성숙하고 안정된 모습을 담은 따뜻한 영상"
+        else:
+            prompt = f"{name}님의 인생의 지혜와 경험을 담은 감동적인 영상"
+        st.info(f"생성된 영상 프롬프트:\n\n{prompt}")
+        st.session_state["video_prompt"] = prompt
+
+# --- 2️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드 ---
+st.header(" 얼굴 이미지 입력 및 아바타 생성")
 
 tab1, tab2 = st.tabs(["📸 카메라 촬영", "🖼️ 이미지 업로드"])
 image_pil = None # 사용자가 선택한 원본 이미지 (PIL.Image.Image 객체)
@@ -89,7 +116,7 @@ if image_pil:
         st.image(face_img, caption="✂️ 추출된 얼굴", width=256) # 추출된 얼굴 표시
 
         # 아바타 생성을 위한 프롬프트 설정 (텍스트 프롬프트)
-        avatar_generation_prompt = "A friendly and expressive cartoon avatar, digital art style"
+        avatar_generation_prompt = "Create a realistic 3D-style avatar based on the original photo. Maintain the person's key features, but enhance them subtly to make the avatar look more attractive and polished. Give the skin a clear, smooth texture, slightly brighten and sharpen the eyes, and refine the facial symmetry naturally. The overall look should remain true to the original but appear slightly more idealized and elegant. Render it in a high-quality, photorealistic 3D avatar style, with natural lighting and smooth shading — no over-stylization."
 
         avatar_urls = [] # generate_avatar_image가 반환할 URL 리스트
         try:
@@ -129,32 +156,7 @@ if image_pil:
             st.warning("아바타 이미지를 표시하거나 저장할 수 없습니다 (이미지 생성/다운로드 실패).")
 
 
-# --- 2️⃣ 이름/생년 입력 및 프롬프트 생성 ---
-st.title("맞춤형 영상 프롬프트 생성기 🎬")
-name = st.text_input("이름을 입력하세요")
-birth_year = st.number_input("태어난 년도를 입력하세요", min_value=1900, max_value=datetime.now().year, step=1)
 
-def get_age(birth_year):
-    """생년월일로 나이를 계산합니다."""
-    return datetime.now().year - birth_year
-
-if st.button("프롬프트 생성"):
-    if not name:
-        st.warning("이름을 입력해주세요.")
-    else:
-        age = get_age(birth_year)
-        st.write(f"안녕하세요, {name}님! 현재 나이는 {age}세입니다.")
-        # 나이에 따른 비디오 프롬프트 생성
-        if age < 20:
-            prompt = f"{name}님의 어린 시절 모습을 담은 밝고 활기찬 영상"
-        elif age < 40:
-            prompt = f"{name}님의 젊고 역동적인 모습을 담은 세련된 영상"
-        elif age < 60:
-            prompt = f"{name}님의 성숙하고 안정된 모습을 담은 따뜻한 영상"
-        else:
-            prompt = f"{name}님의 인생의 지혜와 경험을 담은 감동적인 영상"
-        st.info(f"생성된 영상 프롬프트:\n\n{prompt}")
-        st.session_state["video_prompt"] = prompt
 
 # --- 3️⃣ 음성 녹음 및 Whisper 전사 ---
 
@@ -211,7 +213,7 @@ def transcribe_audio(model, audio_input):
         return transcript, summary, script
     except Exception as e:
         st.error(f"오디오 전사/요약/스크립트 생성 중 오류 발생: {e}")
-        return "", "", ""
+        return "", "", "" 
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path) # 임시 파일 삭제
