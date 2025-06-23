@@ -34,8 +34,8 @@ if "script" not in st.session_state:
     st.session_state["script"] = None
 
 # --- UI 설정 ---
-st.set_page_config(page_title="공감 on(溫)", layout="centered")
-st.title("📸 공감 on(溫)")
+st.set_page_config(page_title="공감 필름", layout="centered")
+st.title("📸 공감 필름")
 
 # --- 0️⃣ 모델 로드 버튼 ---
 if st.session_state.model is None:
