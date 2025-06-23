@@ -225,16 +225,7 @@ elif st.session_state.step == "record_interview":
             with st.container(border=True):
                 st.markdown("💡 **답변 Tip: 풍부한 이야기를 위한 육하원칙!**")
                 st.caption("답변에 아래 내용을 포함하면 더 생생한 이야기가 돼요.")
-                st.markdown(
-                """
-                - **누가 (Who):** 이야기의 주인공은 누구인가요?
-                - **언제 (When):** 그 일은 언제 있었나요? (예: 작년 여름, 어릴 적 저녁)
-                - **어디서 (Where):** 어떤 장소였나요?
-                - **무엇을 (What):** 어떤 특별한 사건이 있었나요?
-                - **왜 (Why):** 그 순간이 왜 중요하고 특별했나요?
-                - **어떻게 (How):** 당시의 분위기나 감정은 어땠나요?
-                """
-            )
+                st.markdown("- **누가, 언제, 어디서, 무엇을, 왜, 어떻게**")
             
             record_duration = st.slider("답변 녹음 시간(초)", 10, 180, 30, key="answer_duration")
             if IS_LOCAL and st.button(f"🎤 답변 녹음하기 ({record_duration}초)"):
