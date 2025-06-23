@@ -13,7 +13,7 @@ import openai
 # --- 1. gpt_summarizer.py에서 함수 import ---
 # --------------------------------------------------------------------------
 try:
-    from gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
+    from summarizer.gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
 except ImportError:
     st.error("오류: gpt_summarizer.py 파일을 찾을 수 없습니다. app.py와 같은 폴더에 있는지 확인해주세요.")
     st.stop()
