@@ -6,57 +6,57 @@ import wave
 import tempfile
 import os
 import platform
-import openai
 from datetime import datetime
-
-from summarizer.gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
-# --- 다른 파이썬 파일에서 핵심 로직 import ---
-
+import openai
 
 # --------------------------------------------------------------------------
-# --- 0. 초기 설정: 플랫폼 확인, 폴더 생성 ---
+# --- gpt_summarizer.py에서 함수 import ---
+# --------------------------------------------------------------------------
+try:
+    from summarizer.gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
+except ImportError:
+    st.error("오류: gpt_summarizer.py 파일을 찾을 수 없습니다. app.py와 같은 폴더에 있는지 확인해주세요.")
+    st.stop()
+
+# --------------------------------------------------------------------------
+# --- 0. 초기 설정 및 헬퍼 함수 정의 ---
 # --------------------------------------------------------------------------
 
-# 플랫폼 확인 (로컬 환경에서만 마이크 녹음 기능 활성화)
+# 플랫폼 확인
 IS_LOCAL = platform.system() != "Linux"
 if IS_LOCAL:
     try:
         import sounddevice as sd
-    except Exception as e:
-        # st.error(f"Sounddevice 로드 실패: {e}") # 사용자에게 너무 기술적인 오류는 숨길 수 있습니다.
+    except Exception:
         IS_LOCAL = False
 
 # 이미지 저장 폴더 생성
 os.makedirs("image_storage", exist_ok=True)
 
+# (record_audio, numpy_to_wav_bytes, transcribe_audio_from_bytes 등 모든 헬퍼 함수는
+# 이전 답변의 풀코드와 동일하게 여기에 위치합니다.)
+# ... 헬퍼 함수 정의 ...
 
 # --------------------------------------------------------------------------
-# --- 1. 헬퍼 함수 정의 (오디오, 아바타, 비디오 등) ---
+# --- 2. Streamlit UI 및 상태 관리 ---
 # --------------------------------------------------------------------------
 
-# --- Audio Processing Functions ---
-def record_audio(duration_sec=10, fs=16000):
-    """지정된 시간 동안 마이크에서 오디오를 녹음합니다."""
-    st.info(f"{duration_sec}초간 인터뷰 녹음을 시작합니다...")
-    try:
-        audio_data = sd.rec(int(duration_sec * fs), samplerate=fs, channels=1, dtype='int16')
-        sd.wait()
-        st.success("녹음이 완료되었습니다!")
-        return audio_data.flatten()
-    except Exception as e:
-        st.error(f"오디오 녹음 중 오류가 발생했습니다. 마이크 연결을 확인해주세요.\n오류: {e}")
-        return None
+st.title("👨‍👩‍👧‍👦 가족 이야기 AI 영상 만들기")
 
-def numpy_to_wav_bytes(audio_np, fs=16000):
-    """Numpy 오디오 배열을 WAV 형식의 BytesIO 객체로 변환합니다."""
-    buffer = io.BytesIO()
-    with wave.open(buffer, 'wb') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2) # 16-bit
-        wf.setframerate(fs)
-        wf.writeframes(audio_np.tobytes())
-    buffer.seek(0)
-    return buffer
+# --- ⭐️ 핵심 수정: 모든 세션 상태 변수를 명확하게 초기화 ---
+default_states = {
+    "step": "select_theme",
+    "family_name": "",
+    "selected_theme": "",
+    "saved_image_path": None,
+    "final_prompt": None,
+    "qa_list": [],  # qa_list를 빈 리스트로 초기화
+    "current_question": "",
+    "transcript": "" # transcript도 초기화
+}
+for key, value in default_stats.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 def transcribe_audio_from_bytes(audio_bytes_io):
     """BytesIO 오디오 객체를 Whisper API로 전사합니다."""
@@ -187,9 +187,8 @@ elif st.session_state.step == "show_questions":
 # ⭐️ 4단계: 대화형 인터뷰 녹음 및 분석 (새로운 로직)
 elif st.session_state.step == "record_interview":
     st.header("4단계: 대화형 인터뷰 진행")
-    st.info("아래에서 질문과 답변을 각각 녹음하여 인터뷰를 완성해보세요.")
-
     # --- 현재까지의 Q&A 목록 표시 ---
+    # 이제 st.session_state.qa_list는 항상 존재하므로 이 코드는 안전합니다.
     if st.session_state.qa_list:
         st.subheader("✅ 완성된 질문/답변 목록")
         for i, qa in enumerate(st.session_state.qa_list):
@@ -197,6 +196,7 @@ elif st.session_state.step == "record_interview":
                 st.markdown(f"**Q{i+1}.** {qa['question']}")
                 st.markdown(f"**A{i+1}.** {qa['answer']}")
         st.markdown("---")
+    # ... (나머지 4단계 코드) ...
 
     # --- 새로운 Q&A 추가 인터페이스 ---
     st.subheader("➕ 새로운 질문 & 답변 추가하기")
