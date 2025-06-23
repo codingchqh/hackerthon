@@ -106,7 +106,7 @@ st.title("👨‍👩‍👧‍👦 가족 이야기 AI 영상 만들기")
 default_states = {
     "step": "select_theme", "family_name": "", "selected_theme": list(interview_questions.keys())[0],
     "saved_image_path": None, "final_prompt": None, "qa_list": [], "current_question": "",
-    "transcript": "", "rerecord_index": None
+    "transcript": "", "rerecord_index": None # ⭐️ 재녹음할 답변의 인덱스
 }
 for key, value in default_states.items():
     if key not in st.session_state:
@@ -118,7 +118,6 @@ if st.session_state.step == "select_theme":
     st.header("1단계: 영상 테마 정하기")
     st.session_state.family_name = st.text_input("가족의 호칭을 입력하세요", value=st.session_state.family_name, placeholder="예: 사랑하는 우리 가족")
     themes = list(interview_questions.keys())
-    # st.radio의 index가 범위를 벗어나지 않도록 안전장치 추가
     try:
         current_index = themes.index(st.session_state.selected_theme)
     except ValueError:
@@ -133,6 +132,7 @@ if st.session_state.step == "select_theme":
 
 elif st.session_state.step == "capture_avatar":
     st.header("2단계: 영상에 사용할 얼굴 사진 입력")
+    # ... (생략 없음, 이전 풀코드와 동일)
     image_pil = None
     if IS_LOCAL:
         tab1, tab2 = st.tabs(["📸 카메라 촬영", "🖼️ 이미지 업로드"])
@@ -160,6 +160,7 @@ elif st.session_state.step == "capture_avatar":
     if st.session_state.saved_image_path:
         if st.button("다음 단계로: 인터뷰 준비 ▶️", type="primary"):
             st.session_state.step = "show_questions"; st.rerun()
+
 
 elif st.session_state.step == "show_questions":
     st.header("3단계: 인터뷰 준비")
@@ -205,6 +206,10 @@ elif st.session_state.step == "record_interview":
                         st.session_state.qa_list[idx]['is_complete'] = analyze_single_qa_pair(st.session_state.qa_list[idx]['question'], new_answer)
                         st.session_state.rerecord_index = None
                         st.rerun()
+        if st.button("취소", key=f"cancel_rerecord_{idx}"):
+            st.session_state.rerecord_index = None
+            st.rerun()
+            
     else:
         st.subheader("➕ 새로운 질문 & 답변 추가하기")
         with st.expander("📖 선택한 테마의 예시 질문 다시보기"):
@@ -225,16 +230,7 @@ elif st.session_state.step == "record_interview":
             with st.container(border=True):
                 st.markdown("💡 **답변 Tip: 풍부한 이야기를 위한 육하원칙!**")
                 st.caption("답변에 아래 내용을 포함하면 더 생생한 이야기가 돼요.")
-                st.markdown(
-                """
-                - **누가 (Who):** 이야기의 주인공은 누구인가요?
-                - **언제 (When):** 그 일은 언제 있었나요? (예: 작년 여름, 어릴 적 저녁)
-                - **어디서 (Where):** 어떤 장소였나요?
-                - **무엇을 (What):** 어떤 특별한 사건이 있었나요?
-                - **왜 (Why):** 그 순간이 왜 중요하고 특별했나요?
-                - **어떻게 (How):** 당시의 분위기나 감정은 어땠나요?
-                """
-            )
+                st.markdown("- **누가, 언제, 어디서, 무엇을, 왜, 어떻게**")
             
             record_duration = st.slider("답변 녹음 시간(초)", 10, 180, 30, key="answer_duration")
             if IS_LOCAL and st.button(f"🎤 답변 녹음하기 ({record_duration}초)"):
@@ -275,7 +271,9 @@ elif st.session_state.step == "create_video":
 
 if st.session_state.step != "select_theme":
     if st.button("처음으로 돌아가기"):
-        for key in default_states.keys():
+        # 세션 상태 초기화
+        keys_to_reset = ["step", "family_name", "selected_theme", "saved_image_path", "final_prompt", "qa_list", "current_question", "transcript", "rerecord_index"]
+        for key in keys_to_reset:
             if key in st.session_state:
                 del st.session_state[key]
         st.rerun()
