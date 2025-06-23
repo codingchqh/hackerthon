@@ -6,8 +6,10 @@ import wave
 import tempfile
 import os
 import platform
+import openai
 from datetime import datetime
 
+from summarizer.gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
 # --- 다른 파이썬 파일에서 핵심 로직 import ---
 
 

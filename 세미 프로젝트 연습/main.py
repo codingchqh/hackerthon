@@ -7,7 +7,7 @@ from camera.face_capture import extract_face
 from avatar_create.avatar_generator import generate_avatar  # 아바타 생성 함수 import
 from video.Text_To_video import make_video_from_text, save_wav_file
 from avatar_create.avatar_batch_processor import extract_faces_with_positions, generate_enhanced_faces, replace_faces_on_image
-from summarizer.gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
+
 # --- 설정 ---
 AUDIO_FILE = "audio/recorded.wav"
 ORIGINAL_IMAGE_FILE = "camera/sample.jpg"
