@@ -9,8 +9,7 @@ import platform
 from datetime import datetime
 
 # --- 다른 파이썬 파일에서 핵심 로직 import ---
-# gpt_summarizer.py 파일이 이 app.py와 같은 폴더에 있어야 합니다.
-from gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
+
 
 # --------------------------------------------------------------------------
 # --- 0. 초기 설정: 플랫폼 확인, 폴더 생성 ---
