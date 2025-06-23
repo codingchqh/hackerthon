@@ -1,5 +1,3 @@
-# app.py (이전 코드와 동일)
-
 import streamlit as st
 from PIL import Image
 import io
@@ -11,13 +9,8 @@ import os
 import platform
 from datetime import datetime
 
-# avatar_generator 모듈에서 필요한 함수들을 임포트합니다.
-from avatar_create.avatar_generator import generate_avatar_image, download_image_from_url
-
-# camera/face_capture.py에 extract_face 함수가 있다고 가정합니다.
+from avatar_create.avatar_generator import generate_avatar_image, download_image_from_url, generate_avatar
 from camera.face_capture import extract_face
-
-# summarizer/gpt_summarizer.py에 summarize_text, generate_video_script 함수가 있다고 가정합니다.
 from summarizer.gpt_summarizer import summarize_text, generate_video_script
 
 # --- 플랫폼 확인 (로컬/클라우드 구분) ---
@@ -84,10 +77,10 @@ if st.button("프롬프트 생성"):
         st.session_state["video_prompt"] = prompt
 
 # --- 2️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드 ---
-st.header(" 얼굴 이미지 입력 및 아바타 생성")
+st.header("2️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드")
 
 tab1, tab2 = st.tabs(["📸 카메라 촬영", "🖼️ 이미지 업로드"])
-image_pil = None # 사용자가 선택한 원본 이미지 (PIL.Image.Image 객체)
+image_pil = None
 
 with tab1:
     image_file = st.camera_input("아바타용 사진을 찍어보세요")
@@ -101,49 +94,43 @@ with tab2:
         image_pil = Image.open(uploaded_file)
         st.image(image_pil, caption="🖼️ 업로드된 이미지", use_container_width=True)
 
-# 이미지가 입력되었을 때만 처리
 if image_pil:
-    face_img = None # 추출된 얼굴 이미지 (PIL.Image.Image 객체)
+    gender = st.radio("이 사진 속 인물의 성별은?", ["남자", "여자"], horizontal=True)
+    face_img = None
     try:
-        face_img = extract_face(image_pil) # camera.face_capture 모듈의 함수 호출
+        face_img = extract_face(image_pil)
     except Exception as e:
         st.error(f"얼굴 추출 중 오류 발생: {e}")
-        face_img = None # 오류 발생 시 None으로 설정
+        face_img = None
 
     if face_img is None:
         st.error("😢 얼굴을 인식하지 못했습니다. 다른 이미지를 시도해주세요.")
     else:
-        st.image(face_img, caption="✂️ 추출된 얼굴", width=256) # 추출된 얼굴 표시
+        st.image(face_img, caption="✂️ 추출된 얼굴", width=256)
 
-        # 아바타 생성을 위한 프롬프트 설정 (텍스트 프롬프트)
-        avatar_generation_prompt = "Improve the visual quality of this person's face while keeping everything true to the original. Just make the person look more polished and attractive, without changing identity, gender, or age."
-
-        avatar_urls = [] # generate_avatar_image가 반환할 URL 리스트
-        try:
-            # generate_avatar_image 함수 호출 (수정된 이름)
-            # DALL-E는 텍스트 프롬프트만 받으므로, face_img가 아니라 텍스트 프롬프트를 전달합니다.
-            avatar_urls = generate_avatar_image(prompt=avatar_generation_prompt, n_images=1)
-        except Exception as e:
-            st.error(f"아바타 이미지 생성 요청 중 오류 발생: {e}")
-            avatar_urls = []
-
-        avatar_img = None # 최종 아바타 이미지 (PIL.Image.Image 객체)
-        if avatar_urls:
-            print("생성된 아바타 이미지 URL:", avatar_urls[0])
-            try:
-                # 다운로드 함수 호출
-                avatar_img = download_image_from_url(avatar_urls[0])
-            except Exception as e:
-                st.error(f"아바타 이미지 다운로드 또는 처리 중 오류 발생: {e}")
-                avatar_img = None
+        if gender == "남자":
+            avatar_generation_prompt = (
+                "Create a realistic portrait of a man based on the original image. Keep all of his facial features and structure intact. "
+                "Enhance his appearance subtly: smooth skin texture, defined jawline, sharp and expressive eyes, and soft natural lighting. "
+                "Maintain a masculine look with a confident but approachable expression. Do not feminize, stylize, or exaggerate. "
+                "High resolution, photorealistic finish."
+            )
         else:
-            st.error("😢 아바타 이미지 URL 생성에 실패했습니다. OpenAI API 설정 또는 프롬프트를 확인해주세요.")
-            avatar_img = None # URL이 없으면 이미지도 없음
+            avatar_generation_prompt = (
+                "Create a realistic portrait of a woman based on the original image. Keep her facial structure and identity completely intact. "
+                "Enhance her appearance gently: smooth and glowing skin, slightly brightened eyes, soft facial expression, and flattering lighting. "
+                "Preserve a feminine and natural look. Do not stylize or exaggerate. "
+                "Final result should look like a refined studio photo of a real woman. High resolution, photorealistic style."
+            )
 
-        # avatar_img가 유효한 Image 객체일 때만 표시 및 저장
+        avatar_img = None
+        try:
+            avatar_img = generate_avatar(avatar_generation_prompt)
+        except Exception as e:
+            st.error(f"아바타 이미지 생성 오류: {e}")
+
         if avatar_img is not None and isinstance(avatar_img, Image.Image):
             st.image(avatar_img, caption="🖼️ 생성된 AI 아바타", use_container_width=True)
-
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path = f"image/avatar_{timestamp}.jpg"
             try:

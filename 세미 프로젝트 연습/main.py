@@ -6,6 +6,7 @@ from summarizer.gpt_summarizer import summarize_text, generate_video_script
 from camera.face_capture import extract_face
 from avatar_create.avatar_generator import generate_avatar  # 아바타 생성 함수 import
 from video.Text_To_video import make_video_from_text, save_wav_file
+from avatar_create.avatar_batch_processor import extract_faces_with_positions, generate_enhanced_faces, replace_faces_on_image
 
 # --- 설정 ---
 AUDIO_FILE = "audio/recorded.wav"
