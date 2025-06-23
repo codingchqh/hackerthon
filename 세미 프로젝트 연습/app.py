@@ -3,314 +3,250 @@ from PIL import Image
 import io
 import numpy as np
 import wave
-import whisper
 import tempfile
 import os
 import platform
 from datetime import datetime
+import openai
 
-from avatar_create.avatar_generator import generate_avatar_image, download_image_from_url, generate_avatar
-from camera.face_capture import extract_face
-from summarizer.gpt_summarizer import summarize_text, generate_video_script
+# --- 0. 기본 설정 및 함수 정의 ---
 
-# --- 플랫폼 확인 (로컬/클라우드 구분) ---
+# 플랫폼 확인 (로컬/클라우드 구분)
 IS_LOCAL = platform.system() != "Linux"
 if IS_LOCAL:
-    import sounddevice as sd
-
-# --- 모델 로드 함수 ---
-def load_model():
-    """Whisper 모델을 로드합니다."""
-    return whisper.load_model("base")
-
-# --- 세션 상태 초기화 ---
-if "model" not in st.session_state:
-    st.session_state.model = None
-if "saved_image_path" not in st.session_state:
-    st.session_state["saved_image_path"] = None
-if "video_prompt" not in st.session_state:
-    st.session_state["video_prompt"] = None
-if "script" not in st.session_state:
-    st.session_state["script"] = None
-
-# --- UI 설정 ---
-st.set_page_config(page_title="공감 필름", layout="centered")
-st.title("📸 공감 필름")
-
-# --- 0️⃣ 모델 로드 버튼 ---
-if st.session_state.model is None:
-    if st.button("모델 로드하기"):
-        with st.spinner("모델을 로딩중입니다... 잠시만 기다려주세요."):
-            st.session_state.model = load_model()
-        st.success("✅ 모델이 성공적으로 로드되었습니다!")
-else:
-    st.info("✅ 모델이 로드되어 사용 가능합니다.")
-
-# --- 디렉토리 생성 ---
-os.makedirs("image", exist_ok=True)
-
-# --- 👨‍👩‍👧‍👦 가족 이름 입력 및 테마 선택 ---
-st.title("가족 이야기 영상 프롬프트 생성기 👨‍👩‍👧‍👦")
-
-# 1. 가족 이름 입력
-family_name = st.text_input("가족의 호칭을 입력하세요 (예: 사랑하는 우리 가족, 행복한 김씨네)")
-
-# 2. 영상 테마 6가지 정의
-themes = [
-    "우리의 평범하지만 소중한 일상",
-    "함께 떠났던 즐거운 여행의 추억",
-    "특별한 날의 행복했던 순간들 (생일, 명절 등)",
-    "아이들의 사랑스러운 성장 기록",
-    "다시 봐도 웃음이 나는 우리 가족의 재미있는 순간",
-    "서로에게 전하는 사랑과 감사의 메시지"
-]
-
-# 3. 라디오 버튼으로 테마 선택
-selected_theme = st.radio(
-    "어떤 테마의 영상을 만들고 싶으신가요?",
-    themes,
-    # index=0 # 기본 선택값을 첫 번째 옵션으로 설정
-)
-
-# 4. 프롬프트 생성 버튼
-if st.button("프롬프트 생성하기"):
-    # 가족 호칭을 입력했는지 확인
-    if not family_name:
-        st.warning("가족의 호칭을 입력해주세요!")
-    else:
-        # 선택된 테마에 따라 맞춤형 프롬프트 생성
-        if selected_theme == themes[0]: # 우리의 평범하지만 소중한 일상
-            prompt = f"'{family_name}'의 소소한 행복이 담긴 일상을 따뜻하고 감성적인 영상으로 만들어줘. 아침 식사, 함께하는 산책, 저녁의 대화 같은 장면을 중심으로."
-
-        elif selected_theme == themes[1]: # 함께 떠났던 즐거운 여행의 추억
-            prompt = f"'{family_name}'이 함께 떠났던 여행의 순간들을 모아 경쾌하고 신나는 영상으로 만들어줘. 아름다운 풍경과 가족들의 웃음소리가 가득하게."
-
-        elif selected_theme == themes[2]: # 특별한 날의 행복했던 순간들
-            prompt = f"'{family_name}'의 생일 파티, 기념일, 명절 등 특별했던 날의 기억들을 모아 행복이 넘치는 축제 분위기의 영상으로 제작해줘."
-
-        elif selected_theme == themes[3]: # 아이들의 사랑스러운 성장 기록
-            prompt = f"'{family_name}' 아이들의 사랑스러운 성장 과정을 담은 영상. 첫 걸음마부터 입학식까지, 감동적인 순간들을 시간 순서대로 보여줘."
-
-        elif selected_theme == themes[4]: # 다시 봐도 웃음이 나는 우리 가족의 재미있는 순간
-            prompt = f"'{family_name}'의 배꼽 빠지는 재미있는 실수나 장난들을 모아서 유쾌하고 코믹한 시트콤 같은 영상으로 만들어줘. 웃음 효과음도 넣어줘."
-
-        elif selected_theme == themes[5]: # 서로에게 전하는 사랑과 감사의 메시지
-            prompt = f"'{family_name}' 구성원들이 서로에게 전하는 진심 어린 사랑과 감사의 마음을 담은 뭉클한 영상. 잔잔한 배경 음악과 함께 따뜻한 메시지를 자막으로 넣어줘."
-
-        # 생성된 프롬프트 보여주기
-        st.info(f"✅ 생성된 영상 프롬프트입니다:")
-        st.write(f"**{prompt}**")
-
-        # 세션 상태에 프롬프트 저장 (다른 페이지나 기능에서 사용하기 위함)
-        st.session_state["video_prompt"] = prompt
-
-# --- 2️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드 ---
-st.header("2️⃣ 사진 입력: 카메라 촬영 또는 이미지 업로드")
-
-tab1, tab2 = st.tabs(["📸 카메라 촬영", "🖼️ 이미지 업로드"])
-image_pil = None
-
-with tab1:
-    image_file = st.camera_input("아바타용 사진을 찍어보세요")
-    if image_file:
-        image_pil = Image.open(image_file)
-        st.image(image_pil, caption="📷 촬영된 원본 이미지", use_container_width=True)
-
-with tab2:
-    uploaded_file = st.file_uploader("이미지를 업로드하세요 (jpg/png)", type=["jpg", "jpeg", "png"])
-    if uploaded_file:
-        image_pil = Image.open(uploaded_file)
-        st.image(image_pil, caption="🖼️ 업로드된 이미지", use_container_width=True)
-
-if image_pil:
-    gender = st.radio("이 사진 속 인물의 성별은?", ["남자", "여자"], horizontal=True)
-    face_img = None
     try:
-        face_img = extract_face(image_pil)
+        import sounddevice as sd
     except Exception as e:
-        st.error(f"얼굴 추출 중 오류 발생: {e}")
-        face_img = None
+        st.error(f"Sounddevice 로드 실패. 마이크 사용이 불가할 수 있습니다: {e}")
+        IS_LOCAL = False
 
-    if face_img is None:
-        st.error("😢 얼굴을 인식하지 못했습니다. 다른 이미지를 시도해주세요.")
-    else:
-        st.image(face_img, caption="✂️ 추출된 얼굴", width=256)
+# OpenAI API 키 설정
+# 실제 배포 시에는 st.secrets 사용을 권장합니다.
+# openai.api_key = st.secrets["OPENAI_API_KEY"] 
+try:
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    if openai.api_key is None:
+        st.error("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+except Exception as e:
+    st.error(f"API 키를 로드하는 중 오류가 발생했습니다: {e}")
 
-        if gender == "남자":
-            avatar_generation_prompt = (
-                "Create a photorealistic studio portrait of a Korean man based on the original image. "
-                "Preserve all facial features and structure, ensuring the identity and ethnicity are clearly Korean. "
-                "Enhance his appearance subtly: smooth skin texture, defined jawline, sharp expressive eyes, and soft, natural lighting. "
-                "Maintain a masculine look with a confident but approachable expression. "
-                "Do not exaggerate, stylize, or westernize. High-resolution, true-to-life realism."
-            )
+# --- Helper Functions (GPT, Audio, Avatar) ---
 
-        else:
-            avatar_generation_prompt = (
-                "Create a photorealistic studio portrait of a Korean woman based on the original image. "
-                "Keep her facial structure, identity, and Korean ethnicity clearly intact. "
-                "Gently enhance her features: smooth glowing skin, brightened eyes, soft expression, and flattering lighting. "
-                "Maintain a feminine and natural appearance, avoiding stylization or exaggeration. "
-                "The result should look like a refined studio photo of a real Korean woman. High resolution, true-to-life realism."
-            )
-
-
-        avatar_img = None
-        try:
-            avatar_img = generate_avatar(avatar_generation_prompt)
-        except Exception as e:
-            st.error(f"아바타 이미지 생성 오류: {e}")
-
-        if avatar_img is not None and isinstance(avatar_img, Image.Image):
-            st.image(avatar_img, caption="🖼️ 생성된 AI 아바타", use_container_width=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = f"image/avatar_{timestamp}.jpg"
-            try:
-                avatar_img.save(save_path)
-                st.success(f"✅ 아바타 이미지 저장 완료: {save_path}")
-                st.session_state["saved_image_path"] = save_path
-            except Exception as e:
-                st.error(f"아바타 이미지 저장 중 오류 발생: {e}")
-        else:
-            st.warning("아바타 이미지를 표시하거나 저장할 수 없습니다 (이미지 생성/다운로드 실패).")
-
-
-
-
-# --- 3️⃣ 음성 녹음 및 Whisper 전사 ---
-
-def record_audio(duration_sec=5, fs=16000, device=None):
-    """마이크에서 오디오를 녹음합니다."""
-    if not IS_LOCAL:
-        st.error("⚠️ 로컬에서만 녹음이 가능합니다. 클라우드 환경에서는 오디오 파일 업로드를 이용해주세요.")
-        return None
-    
-    if st.session_state.model is None:
-        st.warning("Whisper 모델이 로드되지 않았습니다. 먼저 모델을 로드해주세요.")
-        return None
-
+# gpt_summarizer.py의 함수들
+def summarize_text(text: str) -> str:
+    prompt = f"Summarize the following interview transcript concisely in one or two sentences in Korean:\n\n{text}"
     try:
-        st.info(f"{duration_sec}초간 녹음 시작...")
-        # sounddevice가 설치되어 있어야 합니다.
-        audio = sd.rec(int(duration_sec * fs), samplerate=fs, channels=1, dtype='int16', device=device)
+        response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "system", "content": "You are a helpful summarization expert."}, {"role": "user", "content": prompt}], max_tokens=300, temperature=0.5)
+        return response.choices[0].message.content.strip()
+    except Exception as e: return f"요약 중 오류 발생: {e}"
+
+def create_final_video_prompt(family_name: str, theme: str, transcript: str) -> str:
+    prompt = f"""You are a creative and empathetic video director. Your task is to create a detailed, scene-by-scene storyboard prompt in English for an AI video generator.
+    **Family Name:** {family_name}
+    **Chosen Video Theme:** {theme}
+    **Full Interview Transcript (in Korean):**\n---\n{transcript}\n---
+    Based on all the information above, generate a rich, descriptive prompt that outlines a short video. Describe scenes, camera angles, emotions, and overall style to bring the family's story to life.
+    Example: "Scene 1: A warm, sunlit kitchen. Close-up on the laughing face of '{family_name}' as they share a story. Style: nostalgic, warm, cinematic."
+    """
+    try:
+        response = openai.chat.completions.create(model="gpt-4o", messages=[{"role": "system", "content": "You are a professional video director creating prompts for an AI video generator."}, {"role": "user", "content": prompt}], max_tokens=500, temperature=0.7)
+        return response.choices[0].message.content.strip()
+    except Exception as e: return f"프롬프트 생성 중 오류 발생: {e}"
+
+# 오디오 처리 함수들
+def record_audio(duration_sec=10, fs=16000):
+    st.info(f"{duration_sec}초간 인터뷰 녹음을 시작합니다...")
+    try:
+        audio_data = sd.rec(int(duration_sec * fs), samplerate=fs, channels=1, dtype='int16')
         sd.wait()
-        st.success("녹음 완료!")
-        return audio.flatten()
+        st.success("녹음이 완료되었습니다!")
+        return audio_data.flatten()
     except Exception as e:
-        st.error(f"오디오 녹음 중 오류 발생: {e}")
+        st.error(f"오디오 녹음 중 오류가 발생했습니다. 마이크 연결을 확인해주세요. 오류: {e}")
         return None
 
 def numpy_to_wav_bytes(audio_np, fs=16000):
-    """Numpy 배열을 WAV 형식의 BytesIO 객체로 변환합니다."""
     buffer = io.BytesIO()
     with wave.open(buffer, 'wb') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2) # 16-bit audio
-        wf.setframerate(fs)
-        wf.writeframes(audio_np.tobytes())
+        wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(fs); wf.writeframes(audio_np.tobytes())
     buffer.seek(0)
     return buffer
 
-def transcribe_audio(model, audio_input):
-    """오디오를 Whisper 모델로 전사하고 요약 및 스크립트를 생성합니다."""
+def transcribe_and_create_prompt(audio_input, family_name, theme):
     tmp_path = None
     try:
-        # Streamlit uploaded_file 객체는 BytesIO와 유사하게 작동합니다.
-        # BytesIO나 업로드된 파일 객체를 임시 파일로 저장하여 Whisper 모델에 전달합니다.
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            audio_input.seek(0) # 파일 포인터를 처음으로 이동 (중요!)
-            tmp_file.write(audio_input.read()) # 오디오 입력의 내용을 읽어 임시 파일에 씁니다.
+            tmp_file.write(audio_input.getvalue())
             tmp_path = tmp_file.name
-
-        result = model.transcribe(tmp_path)
-        transcript = result["text"]
         
-        # summarizer 모듈의 함수 호출 (이 함수들이 정상 작동한다고 가정)
-        summary = summarize_text(transcript) 
-        script = generate_video_script(summary)
+        with open(tmp_path, "rb") as audio_file:
+            result = openai.audio.transcriptions.create(model="whisper-1", file=audio_file)
+        transcript = result.text
         
-        return transcript, summary, script
+        summary = summarize_text(transcript)
+        final_prompt = create_final_video_prompt(family_name, theme, transcript)
+        return transcript, summary, final_prompt
     except Exception as e:
-        st.error(f"오디오 전사/요약/스크립트 생성 중 오류 발생: {e}")
-        return "", "", "" 
+        st.error(f"오디오 처리 중 오류 발생: {e}")
+        return "", "", ""
     finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path) # 임시 파일 삭제
+        if tmp_path and os.path.exists(tmp_path): os.remove(tmp_path)
 
-if IS_LOCAL and st.button("🎙 5초간 녹음하기"):
-    if st.session_state.model is None:
-        st.warning("먼저 모델을 로드해주세요!")
-    else:
-        audio_np = record_audio(duration_sec=5)
-        if audio_np is not None:
-            wav_bytes = numpy_to_wav_bytes(audio_np)
-            st.audio(wav_bytes, format="audio/wav")
-            transcript, summary, script = transcribe_audio(st.session_state.model, wav_bytes)
-            
-            st.subheader("📝 전사 결과")
-            st.write(transcript)
-            st.subheader("🔍 요약")
-            st.write(summary)
-            st.subheader("🎬 감성 영상 스크립트")
-            st.write(script)
-            st.session_state["script"] = script
-        else:
-            st.error("녹음된 오디오가 없습니다.")
+# 아바타 관련 함수 (실제 구현은 별도 파일에)
+def extract_face(image_pil):
+    # DUMMY: 실제 얼굴 추출 로직
+    return image_pil.resize((256, 256))
 
-
-uploaded_audio_file = st.file_uploader("또는 오디오 파일(.wav/.mp3)을 업로드하세요", type=["wav", "mp3"])
-if uploaded_audio_file:
-    if st.session_state.model is None:
-        st.warning("먼저 모델을 로드해주세요!")
-    else:
-        st.audio(uploaded_audio_file, format=f"audio/{uploaded_audio_file.type.split('/')[-1]}")
-        transcript, summary, script = transcribe_audio(st.session_state.model, uploaded_audio_file)
-        
-        st.subheader("📝 전사 결과")
-        st.write(transcript)
-        st.subheader("🔍 요약")
-        st.write(summary)
-        st.subheader("🎬 감성 영상 스크립트")
-        st.write(script)
-        st.session_state["script"] = script
-
-# --- 4️⃣ 영상 생성 ---
-st.header("4️⃣ 영상 생성")
-
-# 세션 상태에서 필요한 정보 가져오기
-prompt = st.session_state.get("video_prompt") # 2단계에서 생성된 영상 프롬프트
-image_path = st.session_state.get("saved_image_path") # 1단계에서 저장된 아바타 이미지 경로
-script = st.session_state.get("script") # 3단계에서 생성된 감성 스크립트
+def generate_avatar(prompt):
+    # DUMMY: 실제 아바타 생성 로직
+    return Image.new('RGB', (512, 512), color = 'red')
 
 def create_video_from_text_and_image(full_prompt, image_path):
-    """
-    영상 생성 로직 (현재는 더미 함수)
-    실제 구현 시 D-ID, RunwayML 등 외부 서비스 연동 필요
-    """
     st.info(f"영상 생성 중...\n\n🧾 프롬프트: {full_prompt}\n🖼️ 이미지 경로: {image_path}")
-    # 여기에 실제 영상 생성 API 호출 또는 로직을 구현합니다.
-    # 예: D-ID API 호출, 이미지 및 텍스트를 전달하여 영상 생성
     st.success("✅ (예시) 영상 생성 완료! 실제 영상 생성 기능은 추후 연동됩니다.")
 
 
-# 영상 생성 버튼 활성화 조건
-can_create_video = False
-if prompt and image_path and os.path.exists(image_path) and script:
-    st.image(image_path, caption="🎨 최종 영상용 얼굴 이미지", use_container_width=True)
-    full_prompt = f"{prompt}\n\n🗣️ 감성 대사:\n{script}"
-    st.info(f"🧾 영상 프롬프트:\n\n{full_prompt}")
-    can_create_video = True
-else:
-    st.warning("⚠️ 영상 생성을 위해 이름/생년 입력, 얼굴 사진, 음성 등을 모두 입력해주세요.")
-    missing_items = []
-    if not prompt: missing_items.append("영상 프롬프트")
-    if not image_path or not os.path.exists(image_path): missing_items.append("아바타 이미지")
-    if not script: missing_items.append("감성 스크립트 (음성 전사/요약)")
-    if missing_items: # 누락된 항목이 있을 때만 표시
-        st.info(f"누락된 항목: {', '.join(missing_items)}")
+# --- 세션 상태 및 UI 초기화 ---
+st.title("👨‍👩‍👧‍👦 가족 이야기 AI 영상 만들기")
 
+if 'step' not in st.session_state:
+    st.session_state.step = "select_theme"
+# 다른 세션 변수들도 초기화
+default_states = {
+    "family_name": "", "selected_theme": "", "saved_image_path": None,
+    "transcript": "", "summary": "", "final_prompt": None
+}
+for key, value in default_states.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
-if can_create_video:
-    if st.button("🎞️ 영상 만들기"):
-        with st.spinner("영상을 생성 중입니다. 잠시만 기다려주세요..."):
-            create_video_from_text_and_image(full_prompt, image_path)
+os.makedirs("image_storage", exist_ok=True) # 이미지 저장 폴더 생성
+
+# --- 1단계: 테마 선택 ---
+if st.session_state.step == "select_theme":
+    st.header("1단계: 영상 테마 정하기")
+    family_name = st.text_input("가족의 호칭을 입력하세요", placeholder="예: 사랑하는 우리 가족")
+    
+    interview_questions = { "우리의 평범하지만 소중한 일상": [], "함께 떠났던 즐거운 여행의 추억": [], "특별한 날의 행복했던 순간들 (생일, 명절 등)": [], "아이들의 사랑스러운 성장 기록": [], "다시 봐도 웃음이 나는 우리 가족의 재미있는 순간": [], "서로에게 전하는 사랑과 감사의 메시지": [] }
+    themes = list(interview_questions.keys())
+    selected_theme = st.radio("어떤 테마의 영상을 만들고 싶으신가요?", themes, key="theme_radio")
+    
+    if st.button("다음 단계로: 얼굴 사진 입력 ▶️"):
+        if not family_name:
+            st.warning("가족의 호칭을 입력해주세요!")
+        else:
+            st.session_state.family_name = family_name
+            st.session_state.selected_theme = selected_theme
+            st.session_state.step = "capture_avatar"
+            st.rerun()
+
+# --- 2단계: 얼굴 사진(아바타) 입력 ---
+elif st.session_state.step == "capture_avatar":
+    st.header("2단계: 영상에 사용할 얼굴 사진 입력")
+    st.info(f"**가족 호칭:** {st.session_state.family_name} / **테마:** {st.session_state.selected_theme}")
+
+    tab1, tab2 = st.tabs(["📸 카메라 촬영", "🖼️ 이미지 업로드"])
+    image_pil = None
+    with tab1:
+        if IS_LOCAL:
+            image_file = st.camera_input("아바타용 사진을 찍어보세요")
+            if image_file: image_pil = Image.open(image_file)
+        else:
+            st.warning("클라우드 환경에서는 카메라를 사용할 수 없습니다. 파일 업로드를 이용해주세요.")
+    with tab2:
+        uploaded_file = st.file_uploader("이미지를 업로드하세요", type=["jpg", "jpeg", "png"])
+        if uploaded_file: image_pil = Image.open(uploaded_file)
+    
+    if image_pil:
+        st.image(image_pil, caption="📷 원본 이미지", use_container_width=True)
+        with st.spinner("얼굴을 인식하고 아바타를 생성하는 중..."):
+            face_img = extract_face(image_pil)
+            if face_img is None:
+                st.error("😢 얼굴을 인식하지 못했습니다. 다른 이미지를 시도해주세요.")
+            else:
+                st.image(face_img, caption="✂️ 추출된 얼굴", width=256)
+                # DUMMY 아바타 생성 로직, 실제로는 API 호출
+                avatar_img = generate_avatar("dummy prompt") 
+                st.image(avatar_img, caption="🖼️ 생성된 AI 아바타", use_container_width=True)
+                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                save_path = f"image_storage/avatar_{timestamp}.jpg"
+                avatar_img.save(save_path)
+                st.session_state.saved_image_path = save_path
+                st.success(f"✅ 아바타 이미지 저장 완료: {save_path}")
+
+    if st.session_state.saved_image_path:
+        if st.button("다음 단계로: 인터뷰 질문 확인 ▶️"):
+            st.session_state.step = "show_questions"
+            st.rerun()
+
+# --- 3단계: 인터뷰 질문 확인 ---
+elif st.session_state.step == "show_questions":
+    st.header("3단계: 인터뷰 질문 확인")
+    st.info(f"**가족 호칭:** {st.session_state.family_name} / **테마:** {st.session_state.selected_theme}")
+    st.markdown("아래 질문들을 바탕으로 가족과 자유롭게 대화하며 인터뷰를 준비해주세요.")
+    
+    # 실제 질문 목록 표시
+    # for i, q in enumerate(interview_questions[st.session_state.selected_theme]):
+    #     st.markdown(f"**Q{i+1}.** {q}")
+
+    if st.button("✅ 인터뷰 준비 완료! 녹음 시작하기 ▶️"):
+        st.session_state.step = "record_interview"
+        st.rerun()
+
+# --- 4단계: 인터뷰 녹음 및 프롬프트 생성 ---
+elif st.session_state.step == "record_interview":
+    st.header("4단계: 인터뷰 녹음 및 AI 프롬프트 생성")
+    st.info(f"**가족 호칭:** {st.session_state.family_name} / **테마:** {st.session_state.selected_theme}")
+    
+    record_duration = st.slider("녹음할 시간(초)을 선택하세요", 10, 180, 30)
+    if IS_LOCAL and st.button(f"🎙️ {record_duration}초간 인터뷰 녹음 시작"):
+        audio_np = record_audio(duration_sec=record_duration)
+        if audio_np is not None:
+            wav_bytes = numpy_to_wav_bytes(audio_np)
+            st.audio(wav_bytes, format="audio/wav")
+            with st.spinner("음성을 분석하고 영상 프롬프트를 생성하는 중..."):
+                st.session_state.transcript, st.session_state.summary, st.session_state.final_prompt = \
+                    transcribe_and_create_prompt(wav_bytes, st.session_state.family_name, st.session_state.selected_theme)
+
+    uploaded_audio_file = st.file_uploader("또는 녹음된 인터뷰 파일(.wav/.mp3)을 업로드하세요", type=["wav", "mp3", "m4a"])
+    if uploaded_audio_file:
+        st.audio(uploaded_audio_file)
+        with st.spinner("음성을 분석하고 영상 프롬프트를 생성하는 중..."):
+            audio_bytes_io = io.BytesIO(uploaded_audio_file.getvalue())
+            st.session_state.transcript, st.session_state.summary, st.session_state.final_prompt = \
+                transcribe_and_create_prompt(audio_bytes_io, st.session_state.family_name, st.session_state.selected_theme)
+    
+    if st.session_state.final_prompt:
+        st.success("✨ AI 프롬프트 생성이 완료되었습니다!")
+        st.text_area("📝 인터뷰 전체 내용", st.session_state.transcript, height=150)
+        st.text_area("🔍 한 줄 요약", st.session_state.summary, height=50)
+        if st.button("다음 단계로: 최종 확인 및 영상 생성 ▶️"):
+            st.session_state.step = "create_video"
+            st.rerun()
+
+# --- 5단계: 최종 확인 및 영상 생성 ---
+elif st.session_state.step == "create_video":
+    st.header("5단계: 최종 확인 및 영상 생성")
+    
+    image_path = st.session_state.saved_image_path
+    final_prompt = st.session_state.final_prompt
+
+    if image_path and final_prompt:
+        st.info("아래 정보로 최종 영상을 생성합니다.")
+        st.image(image_path, caption="🎨 최종 영상용 아바타 이미지")
+        st.text_area("🎬 최종 영상 AI 프롬프트", final_prompt, height=200)
+        if st.button("🎞️ 이 내용으로 영상 만들기", type="primary"):
+            with st.spinner("영상을 생성 중입니다... (1~2분 소요될 수 있습니다)"):
+                create_video_from_text_and_image(final_prompt, image_path)
+    else:
+        st.error("영상 생성에 필요한 정보가 부족합니다. 처음부터 다시 시작해주세요.")
+
+# --- 처음으로 돌아가기 버튼 ---
+if st.session_state.step != "select_theme":
+    if st.button("처음으로 돌아가기"):
+        # 모든 세션 상태를 초기값으로 리셋
+        for key, value in default_states.items():
+            st.session_state[key] = value
+        st.session_state.step = "select_theme"
+        st.rerun()
