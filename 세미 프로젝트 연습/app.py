@@ -13,6 +13,7 @@ import openai
 # --- 1. gpt_summarizer.py에서 함수 import ---
 # --------------------------------------------------------------------------
 try:
+    # 이 코드가 작동하려면 app.py와 gpt_summarizer.py가 같은 폴더에 있어야 합니다.
     from summarizer.gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
 except ImportError:
     st.error("오류: gpt_summarizer.py 파일을 찾을 수 없습니다. app.py와 같은 폴더에 있는지 확인해주세요.")
@@ -32,6 +33,7 @@ if IS_LOCAL:
 
 # 이미지 저장 폴더 생성
 os.makedirs("image_storage", exist_ok=True)
+
 
 # --- 모든 헬퍼 함수 (Audio, Dummy, etc.) ---
 
@@ -103,8 +105,8 @@ st.title("👨‍👩‍👧‍👦 가족 이야기 AI 영상 만들기")
 # --- 세션 상태 초기화 ---
 default_states = {
     "step": "select_theme", "family_name": "", "selected_theme": list(interview_questions.keys())[0],
-    "saved_image_path": None, "final_prompt": None,
-    "qa_list": [], "current_question": "", "transcript": ""
+    "saved_image_path": None, "final_prompt": None, "qa_list": [], "current_question": "",
+    "transcript": "", "analysis_failed": False
 }
 for key, value in default_states.items():
     if key not in st.session_state:
@@ -136,10 +138,15 @@ elif st.session_state.step == "capture_avatar":
         uploaded_file = st.file_uploader("이미지 업로드", type=["jpg", "jpeg", "png"])
         image_file = None
     
-    if image_file if 'image_file' in locals() and image_file is not None else None: image_pil = Image.open(image_file)
-    if uploaded_file: image_pil = Image.open(uploaded_file)
-
-    if image_pil:
+    # Process the uploaded/captured image
+    processed_image = None
+    if 'image_file' in locals() and image_file is not None:
+        processed_image = Image.open(image_file)
+    elif uploaded_file is not None:
+        processed_image = Image.open(uploaded_file)
+    
+    if processed_image is not None:
+        image_pil = processed_image
         with st.spinner("얼굴을 인식하고 아바타를 생성하는 중..."):
             face_img = extract_face(image_pil)
             avatar_img = generate_avatar(face_img)
@@ -162,75 +169,82 @@ elif st.session_state.step == "show_questions":
     if st.button("✅ 준비 완료! 녹음 시작하기 ▶️", type="primary"):
         st.session_state.step = "record_interview"; st.rerun()
 
+
 elif st.session_state.step == "record_interview":
     st.header("4단계: 대화형 인터뷰 진행")
 
-    with st.expander("📖 선택한 테마의 예시 질문 다시보기", expanded=True):
-        questions = interview_questions.get(st.session_state.selected_theme, [])
-        for q in questions: st.markdown(f"- {q}")
-    st.markdown("---")
+    if st.session_state.analysis_failed:
+        st.warning("⚠️ 이야기의 핵심 요소(누가, 무엇을, 왜)가 부족하여 분석에 실패했습니다.\n\n아래 버튼을 눌러 인터뷰 화면으로 돌아간 뒤, 질문과 답변을 더 추가하여 이야기를 구체화해주세요.")
+        if st.button("🎤 인터뷰 보강하기"):
+            st.session_state.analysis_failed = False
+            st.rerun()
 
-    if st.session_state.qa_list:
-        st.subheader("✅ 완성된 질문/답변 목록")
-        for i, qa in enumerate(st.session_state.qa_list):
-            with st.container(border=True):
-                st.markdown(f"**Q{i+1}.** {qa['question']}")
-                st.markdown(f"**A{i+1}.** {qa['answer']}")
-        st.markdown("---")
-
-    st.subheader("➕ 새로운 질문 & 답변 추가하기")
-
-    if not st.session_state.current_question:
-        st.markdown("**1. 먼저 질문을 녹음하세요.**")
-        if IS_LOCAL and st.button("🎙️ 질문 녹음하기 (5초)"):
-            with st.spinner("질문을 녹음하고 변환 중..."):
-                audio_np = record_audio(duration_sec=5)
-                if audio_np is not None:
-                    wav_bytes = numpy_to_wav_bytes(audio_np)
-                    st.session_state.current_question = transcribe_audio_from_bytes(wav_bytes)
-                    st.rerun()
-    else:
-        st.success(f"**녹음된 질문:** {st.session_state.current_question}")
-        st.markdown("**2. 이제 위 질문에 대한 답변을 녹음하세요.**")
-
-        with st.container(border=True):
-            st.markdown("💡 **답변 Tip: 풍부한 이야기를 위한 육하원칙!**")
-            st.caption("답변하실 때 아래 내용을 포함하면 더 생생하고 감동적인 이야기가 돼요.")
-            st.markdown("- **누가 (Who):** 이야기의 주인공은 누구인가요?\n- **언제 (When):** 그 일은 언제 있었나요?\n- **어디서 (Where):** 어떤 장소였나요?\n- **무엇을 (What):** 어떤 특별한 사건이 있었나요?\n- **왜 (Why):** 그 순간이 왜 중요하고 특별했나요?\n- **어떻게 (How):** 당시의 분위기나 감정은 어땠나요?")
-        
-        record_duration = st.slider("답변 녹음 시간(초)", 10, 180, 30, key="answer_duration")
-        if IS_LOCAL and st.button(f"🎤 답변 녹음하기 ({record_duration}초)"):
-            with st.spinner("답변을 녹음하고 변환 중..."):
-                audio_np = record_audio(duration_sec=record_duration)
-                if audio_np is not None:
-                    wav_bytes = numpy_to_wav_bytes(audio_np)
-                    answer = transcribe_audio_from_bytes(wav_bytes)
-                    if answer:
-                        st.session_state.qa_list.append({"question": st.session_state.current_question, "answer": answer})
-                        st.session_state.current_question = ""
-                        st.rerun()
-    st.markdown("---")
-
-    if st.session_state.qa_list:
-        if st.button("✅ 인터뷰 완료 및 분석 시작", type="primary"):
-            with st.spinner("전체 인터뷰 내용을 종합하여 분석 중입니다..."):
-                full_transcript = "\n\n".join([f"Q: {qa['question']}\nA: {qa['answer']}" for qa in st.session_state.qa_list])
-                st.session_state.transcript = full_transcript
-                analysis_result = analyze_transcript_for_completeness(full_transcript)
-                if analysis_result.is_complete:
-                    final_prompt = create_final_video_prompt(st.session_state.family_name, st.session_state.selected_theme, full_transcript)
-                    st.session_state.final_prompt = final_prompt
-                else:
-                    st.warning("⚠️ 이야기의 핵심 요소(누가, 무엇을, 왜)가 부족합니다.\n\n질문과 답변을 더 추가하여 이야기를 구체화해주세요.")
-            if st.session_state.final_prompt:
-                st.success("충분한 내용이 확인되었습니다! 최종 프롬프트를 생성합니다.")
-                st.rerun()
-    
-    if st.session_state.final_prompt:
+    elif st.session_state.final_prompt:
         st.success("✨ AI 프롬프트 생성이 완료되었습니다!")
         st.text_area("생성된 최종 AI 프롬프트", st.session_state.final_prompt, height=200)
-        if st.button("다음 단계로: 최종 확인 ▶️"):
+        if st.button("다음 단계로: 최종 확인 ▶️", type="primary"):
             st.session_state.step = "create_video"; st.rerun()
+
+    else:
+        with st.expander("📖 선택한 테마의 예시 질문 다시보기", expanded=True):
+            questions = interview_questions.get(st.session_state.selected_theme, [])
+            for q in questions: st.markdown(f"- {q}")
+        st.markdown("---")
+
+        if st.session_state.qa_list:
+            st.subheader("✅ 완성된 질문/답변 목록")
+            for i, qa in enumerate(st.session_state.qa_list):
+                with st.container(border=True):
+                    st.markdown(f"**Q{i+1}.** {qa['question']}")
+                    st.markdown(f"**A{i+1}.** {qa['answer']}")
+            st.markdown("---")
+
+        st.subheader("➕ 새로운 질문 & 답변 추가하기")
+
+        if not st.session_state.current_question:
+            st.markdown("**1. 먼저 질문을 녹음하세요.**")
+            if IS_LOCAL and st.button("🎙️ 질문 녹음하기 (5초)"):
+                with st.spinner("질문을 녹음하고 변환 중..."):
+                    audio_np = record_audio(duration_sec=5)
+                    if audio_np is not None:
+                        wav_bytes = numpy_to_wav_bytes(audio_np)
+                        st.session_state.current_question = transcribe_audio_from_bytes(wav_bytes)
+                        st.rerun()
+        else:
+            st.success(f"**녹음된 질문:** {st.session_state.current_question}")
+            st.markdown("**2. 이제 위 질문에 대한 답변을 녹음하세요.**")
+            with st.container(border=True):
+                st.markdown("💡 **답변 Tip: 풍부한 이야기를 위한 육하원칙!**")
+                st.caption("답변에 아래 내용을 포함하면 더 생생한 이야기가 돼요.")
+                st.markdown("- **누가, 언제, 어디서, 무엇을, 왜, 어떻게**")
+            
+            record_duration = st.slider("답변 녹음 시간(초)", 10, 180, 30, key="answer_duration")
+            if IS_LOCAL and st.button(f"🎤 답변 녹음하기 ({record_duration}초)"):
+                with st.spinner("답변을 녹음하고 변환 중..."):
+                    audio_np = record_audio(duration_sec=record_duration)
+                    if audio_np is not None:
+                        wav_bytes = numpy_to_wav_bytes(audio_np)
+                        answer = transcribe_audio_from_bytes(wav_bytes)
+                        if answer:
+                            st.session_state.qa_list.append({"question": st.session_state.current_question, "answer": answer})
+                            st.session_state.current_question = ""
+                            st.rerun()
+        st.markdown("---")
+
+        if st.session_state.qa_list:
+            if st.button("✅ 인터뷰 완료 및 분석 시작", type="primary"):
+                with st.spinner("전체 인터뷰 내용을 종합하여 분석 중입니다..."):
+                    full_transcript = "\n\n".join([f"Q: {qa['question']}\nA: {qa['answer']}" for qa in st.session_state.qa_list])
+                    st.session_state.transcript = full_transcript
+                    analysis_result = analyze_transcript_for_completeness(full_transcript)
+                    if analysis_result.is_complete:
+                        st.session_state.analysis_failed = False
+                        final_prompt = create_final_video_prompt(st.session_state.family_name, st.session_state.selected_theme, full_transcript)
+                        st.session_state.final_prompt = final_prompt
+                    else:
+                        st.session_state.analysis_failed = True
+                st.rerun()
+
 
 elif st.session_state.step == "create_video":
     st.header("5단계: 최종 확인 및 영상 생성")
@@ -249,4 +263,3 @@ if st.session_state.step != "select_theme":
         for key in default_states.keys():
             st.session_state[key] = default_states[key]
         st.rerun()
-
