@@ -10,7 +10,7 @@ from datetime import datetime
 import openai
 
 # --------------------------------------------------------------------------
-# --- gpt_summarizer.py에서 함수 import ---
+# --- 1. gpt_summarizer.py에서 함수 import ---
 # --------------------------------------------------------------------------
 try:
     from summarizer.gpt_summarizer import analyze_transcript_for_completeness, create_final_video_prompt
@@ -19,7 +19,7 @@ except ImportError:
     st.stop()
 
 # --------------------------------------------------------------------------
-# --- 0. 초기 설정 및 헬퍼 함수 정의 ---
+# --- 2. 초기 설정 및 모든 헬퍼 함수 정의 ---
 # --------------------------------------------------------------------------
 
 # 플랫폼 확인
@@ -33,75 +33,56 @@ if IS_LOCAL:
 # 이미지 저장 폴더 생성
 os.makedirs("image_storage", exist_ok=True)
 
-# (record_audio, numpy_to_wav_bytes, transcribe_audio_from_bytes 등 모든 헬퍼 함수는
-# 이전 답변의 풀코드와 동일하게 여기에 위치합니다.)
-# ... 헬퍼 함수 정의 ...
 
-# --------------------------------------------------------------------------
-# --- 2. Streamlit UI 및 상태 관리 ---
-# --------------------------------------------------------------------------
+# --- ⭐️ 누락되었던 모든 헬퍼 함수 ---
 
-st.title("👨‍👩‍👧‍👦 가족 이야기 AI 영상 만들기")
+def record_audio(duration_sec=10, fs=16000):
+    """지정된 시간 동안 마이크에서 오디오를 녹음합니다."""
+    st.info(f"{duration_sec}초간 인터뷰 녹음을 시작합니다...")
+    try:
+        audio_data = sd.rec(int(duration_sec * fs), samplerate=fs, channels=1, dtype='int16')
+        sd.wait()
+        st.success("녹음이 완료되었습니다!")
+        return audio_data.flatten()
+    except Exception as e:
+        st.error(f"오디오 녹음 중 오류가 발생했습니다: {e}"); return None
 
-# --- ⭐️ 핵심 수정: 모든 세션 상태 변수를 명확하게 초기화 ---
-default_states = {
-    "step": "select_theme",
-    "family_name": "",
-    "selected_theme": "",
-    "saved_image_path": None,
-    "final_prompt": None,
-    "qa_list": [],  # qa_list를 빈 리스트로 초기화
-    "current_question": "",
-    "transcript": "" # transcript도 초기화
-}
-for key, value in default_stats.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
+def numpy_to_wav_bytes(audio_np, fs=16000):
+    """Numpy 오디오 배열을 WAV 형식의 BytesIO 객체로 변환합니다."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, 'wb') as wf:
+        wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(fs); wf.writeframes(audio_np.tobytes())
+    buffer.seek(0)
+    return buffer
 
 def transcribe_audio_from_bytes(audio_bytes_io):
     """BytesIO 오디오 객체를 Whisper API로 전사합니다."""
     tmp_path = None
     try:
-        # BytesIO 객체를 임시 파일로 저장하여 API에 전달
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_bytes_io.getvalue())
             tmp_path = tmp_file.name
-
         with open(tmp_path, "rb") as audio_file:
-            # openai 라이브러리가 최신 버전이어야 합니다.
-            transcript = openai.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="text"
-            )
+            transcript = openai.audio.transcriptions.create(model="whisper-1", file=audio_file, response_format="text")
         return str(transcript)
     except Exception as e:
-        st.error(f"음성 전사 중 오류 발생: {e}")
-        return ""
+        st.error(f"음성 전사 중 오류 발생: {e}"); return ""
     finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if tmp_path and os.path.exists(tmp_path): os.remove(tmp_path)
 
 
 # --- DUMMY Functions (실제 서비스 연동이 필요한 부분) ---
 def extract_face(image_pil):
     """DUMMY: 이미지에서 얼굴 부분을 추출하는 함수입니다."""
-    # 실제 구현 시: OpenCV, dlib 등의 라이브러리 사용
-    st.info("DUMMY: 얼굴 추출 로직 실행 중...")
     return image_pil.resize((256, 256))
 
 def generate_avatar(face_image):
     """DUMMY: AI 아바타를 생성하는 함수입니다."""
-    # 실제 구현 시: Stable Diffusion, Midjourney API 등 연동
-    st.info("DUMMY: AI 아바타 생성 로직 실행 중...")
     return Image.new('RGB', (512, 512), color = 'blue')
 
 def create_video_from_text_and_image(prompt, image_path):
     """DUMMY: 최종 프롬프트와 이미지로 영상을 생성하는 함수입니다."""
-    # 실제 구현 시: D-ID, RunwayML, Pika Labs 등 영상 생성 AI API 연동
-    st.info(f"DUMMY: 영상 생성 중...\n- 프롬프트: {prompt[:100]}...\n- 이미지 경로: {image_path}")
-    st.success("✅ (예시) 영상 생성 완료!")
-    st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") # 예시 비디오
+    st.success("✅ (예시) 영상 생성 완료!");
 
 
 # --- 예시 질문 목록 ---
@@ -115,7 +96,7 @@ interview_questions = {
 }
 
 # --------------------------------------------------------------------------
-# --- 2. Streamlit UI 및 상태 관리 ---
+# --- 3. Streamlit UI 및 상태 관리 ---
 # --------------------------------------------------------------------------
 
 st.title("👨‍👩‍👧‍👦 가족 이야기 AI 영상 만들기")
@@ -123,7 +104,8 @@ st.title("👨‍👩‍👧‍👦 가족 이야기 AI 영상 만들기")
 # --- 세션 상태 초기화 ---
 default_states = {
     "step": "select_theme", "family_name": "", "selected_theme": list(interview_questions.keys())[0],
-    "saved_image_path": None, "transcript": "", "final_prompt": None,
+    "saved_image_path": None, "final_prompt": None,
+    "qa_list": [], "current_question": "", "transcript": ""
 }
 for key, value in default_states.items():
     if key not in st.session_state:
@@ -131,7 +113,7 @@ for key, value in default_states.items():
 
 # --- 단계별 UI 렌더링 ---
 
-# 1단계: 테마 선택
+# 1, 2, 3단계는 이전 코드와 동일
 if st.session_state.step == "select_theme":
     st.header("1단계: 영상 테마 정하기")
     st.session_state.family_name = st.text_input("가족의 호칭을 입력하세요", value=st.session_state.family_name, placeholder="예: 사랑하는 우리 가족")
@@ -144,7 +126,6 @@ if st.session_state.step == "select_theme":
         else:
             st.session_state.step = "capture_avatar"; st.rerun()
 
-# 2단계: 아바타 생성
 elif st.session_state.step == "capture_avatar":
     st.header("2단계: 영상에 사용할 얼굴 사진 입력")
     image_pil = None
@@ -174,7 +155,6 @@ elif st.session_state.step == "capture_avatar":
         if st.button("다음 단계로: 인터뷰 준비 ▶️", type="primary"):
             st.session_state.step = "show_questions"; st.rerun()
 
-# 3단계: 인터뷰 질문 확인
 elif st.session_state.step == "show_questions":
     st.header("3단계: 인터뷰 준비")
     st.info(f"**선택 테마:** {st.session_state.selected_theme}")
@@ -184,11 +164,13 @@ elif st.session_state.step == "show_questions":
     if st.button("✅ 준비 완료! 녹음 시작하기 ▶️", type="primary"):
         st.session_state.step = "record_interview"; st.rerun()
 
-# ⭐️ 4단계: 대화형 인터뷰 녹음 및 분석 (새로운 로직)
+
+# 4단계: 인터뷰 녹음 및 분석
 elif st.session_state.step == "record_interview":
     st.header("4단계: 대화형 인터뷰 진행")
-    # --- 현재까지의 Q&A 목록 표시 ---
-    # 이제 st.session_state.qa_list는 항상 존재하므로 이 코드는 안전합니다.
+    st.info("아래에서 질문과 답변을 각각 녹음하여 인터뷰를 완성해보세요.")
+
+    # 현재까지의 Q&A 목록 표시
     if st.session_state.qa_list:
         st.subheader("✅ 완성된 질문/답변 목록")
         for i, qa in enumerate(st.session_state.qa_list):
@@ -196,9 +178,8 @@ elif st.session_state.step == "record_interview":
                 st.markdown(f"**Q{i+1}.** {qa['question']}")
                 st.markdown(f"**A{i+1}.** {qa['answer']}")
         st.markdown("---")
-    # ... (나머지 4단계 코드) ...
 
-    # --- 새로운 Q&A 추가 인터페이스 ---
+    # 새로운 Q&A 추가 인터페이스
     st.subheader("➕ 새로운 질문 & 답변 추가하기")
 
     # 1. 질문 녹음 단계
@@ -212,11 +193,10 @@ elif st.session_state.step == "record_interview":
                     st.session_state.current_question = transcribe_audio_from_bytes(wav_bytes)
                     st.rerun()
 
-    # 2. 답변 녹음 단계 (질문이 녹음된 후에만 보임)
+    # 2. 답변 녹음 단계
     else:
         st.success(f"**녹음된 질문:** {st.session_state.current_question}")
         st.markdown("**2. 이제 위 질문에 대한 답변을 녹음하세요.**")
-
         record_duration = st.slider("답변 녹음 시간(초)", 10, 180, 30, key="answer_duration")
         if IS_LOCAL and st.button(f"🎤 답변 녹음하기 ({record_duration}초)"):
             with st.spinner("답변을 녹음하고 변환 중..."):
@@ -225,40 +205,32 @@ elif st.session_state.step == "record_interview":
                     wav_bytes = numpy_to_wav_bytes(audio_np)
                     answer = transcribe_audio_from_bytes(wav_bytes)
                     if answer:
-                        # Q&A 쌍을 목록에 추가하고 상태 초기화
-                        st.session_state.qa_list.append({
-                            "question": st.session_state.current_question,
-                            "answer": answer
-                        })
+                        st.session_state.qa_list.append({"question": st.session_state.current_question, "answer": answer})
                         st.session_state.current_question = ""
                         st.rerun()
-
     st.markdown("---")
 
-    # --- 전체 인터뷰 분석 시작 ---
+    # 전체 인터뷰 분석 시작
     if st.session_state.qa_list:
         if st.button("✅ 인터뷰 완료 및 분석 시작", type="primary"):
             with st.spinner("전체 인터뷰 내용을 종합하여 분석 중입니다..."):
-                # Q&A 목록을 하나의 대화록 텍스트로 변환
-                full_transcript = "\n\n".join([f"Interviewer Q: {qa['question']}\nAnswer: {qa['answer']}" for qa in st.session_state.qa_list])
-                st.session_state.transcript = full_transcript # 나중에 확인용으로 저장
-
+                full_transcript = "\n\n".join([f"Q: {qa['question']}\nA: {qa['answer']}" for qa in st.session_state.qa_list])
+                st.session_state.transcript = full_transcript
                 analysis_result = analyze_transcript_for_completeness(full_transcript)
                 if analysis_result.is_complete:
-                    st.success("충분한 내용이 확인되었습니다! 최종 프롬프트를 생성합니다.")
                     final_prompt = create_final_video_prompt(st.session_state.family_name, st.session_state.selected_theme, full_transcript)
                     st.session_state.final_prompt = final_prompt
                 else:
                     st.warning("⚠️ 이야기의 핵심 요소(누가, 무엇을, 왜)가 부족합니다.\n\n질문과 답변을 더 추가하여 이야기를 구체화해주세요.")
-            st.rerun() # 분석 후 UI 업데이트
-
-    # 최종 프롬프트가 생성되었다면 표시하고 다음 단계로 이동
+            if st.session_state.final_prompt:
+                st.success("충분한 내용이 확인되었습니다! 최종 프롬프트를 생성합니다.")
+                st.rerun()
+    
     if st.session_state.final_prompt:
         st.success("✨ AI 프롬프트 생성이 완료되었습니다!")
         st.text_area("생성된 최종 AI 프롬프트", st.session_state.final_prompt, height=200)
         if st.button("다음 단계로: 최종 확인 ▶️"):
-            st.session_state.step = "create_video"
-            st.rerun()
+            st.session_state.step = "create_video"; st.rerun()
 
 # 5단계: 최종 확인 및 영상 생성
 elif st.session_state.step == "create_video":
@@ -268,19 +240,16 @@ elif st.session_state.step == "create_video":
         st.image(st.session_state.saved_image_path, caption="🎨 최종 영상용 아바타 이미지")
         st.text_area("🎬 최종 영상 AI 프롬프트", st.session_state.final_prompt, height=200)
         if st.button("🎞️ 이 내용으로 영상 만들기", type="primary"):
-            with st.spinner("영상을 생성 중입니다... (1~2분 소요될 수 있습니다)"):
+            with st.spinner("영상을 생성 중입니다..."):
                 create_video_from_text_and_image(st.session_state.final_prompt, st.session_state.saved_image_path)
     else:
         st.error("영상 생성에 필요한 정보가 부족합니다. 처음부터 다시 시작해주세요.")
 
+
 # --- '처음으로' 버튼 ---
 if st.session_state.step != "select_theme":
     if st.button("처음으로 돌아가기"):
-        # 세션 상태 초기화 (주의: 모든 진행상황이 사라짐)
-        st.session_state.step = "select_theme"
-        st.session_state.family_name = ""
-        st.session_state.saved_image_path = None
-        st.session_state.transcript = ""
-        st.session_state.final_prompt = None
+        for key in default_states.keys():
+            st.session_state[key] = default_states[key]
         st.rerun()
 
