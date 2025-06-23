@@ -1,9 +1,8 @@
-# gpt_summarizer.py 파일
-
 import os
 import openai
 from typing import List
 
+# LangChain 및 Pydantic 관련 라이브러리
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -11,47 +10,69 @@ from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 
 # --- API 키 설정 ---
+# 이 파일을 단독으로 테스트할 경우를 대비해 포함합니다.
+# app.py에서 import해서 사용할 때는 app.py의 설정이 적용됩니다.
 try:
     openai.api_key = os.getenv("OPENAI_API_KEY")
 except Exception as e:
     print(f"API 키 로드 중 오류 발생: {e}")
 
-# --- 분석가를 위한 출력 구조 정의 ---
-class AnalysisResult(BaseModel):
-    is_complete: bool = Field(description="인터뷰 내용에 육하원칙의 핵심 요소(누가, 무엇을, 왜)가 모두 포함되어 있는지 여부")
-    summary: str = Field(description="현재까지 파악된 인터뷰 내용의 간략한 요약")
 
-# --- 분석가 체인 함수 ---
-def analyze_transcript_for_completeness(transcript: str) -> AnalysisResult:
-    """인터뷰 내용을 엄격하게 분석하여 완전성 여부를 진단합니다."""
-    llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
-    parser = PydanticOutputParser(pydantic_object=AnalysisResult)
-    template = """
-    You are a meticulous analyst. Your task is to strictly analyze an interview transcript.
-    A story is considered "complete" ONLY if it clearly contains the core elements: Who, What, and Why.
-    CRITICAL INSTRUCTION: Do NOT infer or create any information. Your job is ONLY to analyze the provided text.
-    Transcript: --- {transcript} ---
-    Based *only* on the transcript, provide your analysis in the following JSON format.
-    {format_instructions}
+# --- ⭐️ 개별 Q&A 분석을 위한 함수 ---
+def analyze_single_qa_pair(question: str, answer: str) -> bool:
     """
-    prompt = PromptTemplate(template=template, input_variables=["transcript"], partial_variables={"format_instructions": parser.get_format_instructions()})
+    하나의 질문과 답변 쌍을 분석하여, 답변이 충분히 구체적인지 (육하원칙 포함) 판단합니다.
+    True 또는 False를 반환합니다.
+    """
+    llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
+    template = """
+    You are a meticulous analyst. Your task is to determine if the provided 'Answer' is a good, detailed response to the 'Question'.
+    A good answer is NOT abstract or generic. It is specific and contains core story elements (Who, What, Why).
+
+    CRITICAL INSTRUCTION: Analyze ONLY the provided text. Do NOT infer or imagine information.
+
+    - Question: "{question}"
+    - Answer: "{answer}"
+
+    Based on the answer's specificity and inclusion of story elements, respond with only "True" if the answer is sufficient, or "False" if it is too abstract or lacks detail.
+    """
+    prompt = PromptTemplate.from_template(template)
     chain = LLMChain(llm=llm, prompt=prompt)
     try:
-        output = chain.invoke({"transcript": transcript})
-        return parser.parse(output['text'])
+        result = chain.invoke({"question": question, "answer": answer})
+        # LLM의 응답에서 'True' 또는 'False' 문자열을 실제 불리언 값으로 변환
+        # .lower()를 통해 대소문자 구분 없이 처리
+        return "true" in result['text'].lower()
     except Exception as e:
-        print(f"분석 체인 실행 중 오류: {e}")
-        return AnalysisResult(is_complete=True, summary="분석 중 오류 발생")
+        print(f"개별 답변 분석 중 오류: {e}")
+        return False # 오류 발생 시, 일단 불충분으로 간주
+
 
 # --- 최종 프롬프트 생성 함수 ---
 def create_final_video_prompt(family_name: str, theme: str, transcript: str) -> str:
     """모든 정보가 준비되었을 때, 최종 영상 프롬프트를 생성합니다."""
-    # (이 함수는 변경 없이 그대로 사용합니다)
     llm = ChatOpenAI(model_name="gpt-4o", temperature=0.7)
-    template = "..." # (이전과 동일)
-    # ...
+    
+    template = """
+    You are a creative video director. Your task is to create a detailed, scene-by-scene storyboard prompt in English for an AI video generator.
+
+    **Family Name:** {family_name}
+    **Chosen Video Theme:** {theme}
+    **Full Interview Transcript (in Korean):**
+    ---
+    {transcript}
+    ---
+    Based on all information, generate a rich, descriptive prompt that outlines a short video. Describe scenes, camera angles, character emotions, and overall style to bring the family's story to life.
+    """
+    prompt = PromptTemplate.from_template(template)
+    chain = LLMChain(llm=llm, prompt=prompt)
+    
     try:
-        # ...
-        return "..." # (이전과 동일)
+        result = chain.invoke({"family_name": family_name, "theme": theme, "transcript": transcript})
+        return result['text'].strip()
     except Exception as e:
         return f"최종 프롬프트 생성 중 오류: {e}"
+
+# --- analyze_transcript_for_completeness 함수는 더 이상 사용되지 않으므로 삭제 또는 주석 처리 ---
+# class AnalysisResult(BaseModel): ...
+# def analyze_transcript_for_completeness(transcript: str) -> AnalysisResult: ...
